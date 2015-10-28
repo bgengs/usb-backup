@@ -39,7 +39,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>1</number>
+       <number>0</number>
       </property>
       <property name="movable">
        <bool>false</bool>
@@ -60,9 +60,6 @@
            <string>Files found</string>
           </property>
          </widget>
-        </item>
-        <item row="1" column="0" rowspan="6">
-         <widget class="QTreeView" name="treeViewComputer"/>
         </item>
         <item row="1" column="1">
          <widget class="QPushButton" name="foldersButton">
@@ -98,6 +95,13 @@
           </property>
          </spacer>
         </item>
+        <item row="7" column="0">
+         <widget class="QProgressBar" name="progressBarScan">
+          <property name="value">
+           <number>24</number>
+          </property>
+         </widget>
+        </item>
         <item row="5" column="1">
          <widget class="QPushButton" name="backupScanButton">
           <property name="text">
@@ -112,12 +116,8 @@
           </property>
          </widget>
         </item>
-        <item row="7" column="0">
-         <widget class="QProgressBar" name="progressBarScan">
-          <property name="value">
-           <number>24</number>
-          </property>
-         </widget>
+        <item row="1" column="0" rowspan="6">
+         <widget class="QTreeView" name="treeViewComputer"/>
         </item>
        </layout>
        <zorder>filesFoundLabel</zorder>
