@@ -2,38 +2,38 @@
 # -*- coding: utf-8 -*-
 
 import sys, os
-import design.file_types_dialog as design
-#from tree import Node
-from PyQt4 import QtGui, QtCore, uic
+from PyQt4 import uic
+from PyQt4.QtGui import QStandardItemModel, QDirModel, QFileDialog, QStandardItem, QApplication
+from PyQt4.QtCore import Qt, QFileInfo, QObject, SIGNAL, QCoreApplication
 
-class CheckableFileTypes(QtGui.QStandardItemModel):
+class CheckableFileTypes(QStandardItemModel):
     def __init__(self, parent=None):
         super(CheckableFileTypes, self).__init__(parent)
         self.checks = {}
         self.root = self.invisibleRootItem()
 
     def appendRow(self, args):
-        return QtGui.QStandardItemModel.appendRow(self, args)
+        return QStandardItemModel.appendRow(self, args)
 
-    def data(self, index, role=QtCore.Qt.DisplayRole):
-        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.CheckStateRole and index.column() == 0:
             return self.checkState(index)
 
-        return QtGui.QStandardItemModel.data(self, index, role)
+        return QStandardItemModel.data(self, index, role)
 
     def checkState(self, index):
         while index.isValid():
             if index in self.checks:
                 return self.checks[index]
             index = index.parent()
-        return QtCore.Qt.Unchecked
+        return Qt.Unchecked
 
     def flags(self, index):
-        return QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsUserCheckable | QtCore.Qt.ItemIsEnabled
+        return Qt.ItemIsSelectable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled
 
     def setData(self, index, value, role):
 
-        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
+        if role == Qt.CheckStateRole and index.column() == 0:
             self.layoutAboutToBeChanged.emit()
             #for i, v in self.checks.items():
             #    if are_parent_and_child(index, i):
@@ -42,12 +42,12 @@ class CheckableFileTypes(QtGui.QStandardItemModel):
             self.layoutChanged.emit()
             return True
 
-        return QtGui.QDirModel.setData(self, index, value, role)
+        return QDirModel.setData(self, index, value, role)
 
     def exportChecked(self):
         indexes = []
         for index in self.checks.keys():
-            if self.checks[index] == QtCore.Qt.Checked:
+            if self.checks[index] == Qt.Checked:
                 indexes.append(index)
 
         return indexes
@@ -59,19 +59,19 @@ def are_parent_and_child(parent, child):
         child = child.parent()
     return False
 
-class CheckableDirModel(QtGui.QDirModel):
+class CheckableDirModel(QDirModel):
     def __init__(self, parent=None):
-        QtGui.QDirModel.__init__(self, None)
+        QDirModel.__init__(self, None)
         self.checks = {}
 
-    def data(self, index, role=QtCore.Qt.DisplayRole):
+    def data(self, index, role=Qt.DisplayRole):
         #print("data")
-        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
+        if role == Qt.CheckStateRole and index.column() == 0:
             return self.checkState(index)
-        return QtGui.QDirModel.data(self, index, role)
+        return QDirModel.data(self, index, role)
 
     def flags(self, index):
-        return QtGui.QDirModel.flags(self, index) | QtCore.Qt.ItemIsUserCheckable
+        return QDirModel.flags(self, index) | Qt.ItemIsUserCheckable
 
     def checkState(self, index):
 
@@ -79,11 +79,11 @@ class CheckableDirModel(QtGui.QDirModel):
             if index in self.checks:
                 return self.checks[index]
             index = index.parent()
-        return QtCore.Qt.Unchecked
+        return Qt.Unchecked
 
     def setData(self, index, value, role):
         print("setdata")
-        if role == QtCore.Qt.CheckStateRole and index.column() == 0:
+        if role == Qt.CheckStateRole and index.column() == 0:
             self.layoutAboutToBeChanged.emit()
             for i, v in self.checks.items():
                 if are_parent_and_child(index, i):
@@ -92,20 +92,20 @@ class CheckableDirModel(QtGui.QDirModel):
             self.layoutChanged.emit()
             return True
 
-        return QtGui.QDirModel.setData(self, index, value, role)
+        return QDirModel.setData(self, index, value, role)
 
     def exportChecked(self, acceptedSuffix=['jpg', 'png', 'bmp']):
         selection = []
         for index in self.checks.keys():
-            if self.checks[index] == QtCore.Qt.Checked:
+            if self.checks[index] == Qt.Checked:
                 if os.path.isfile(unicode(self.filePath(index))):
                     #if QtCore.QFileInfo(unicode(self.filePath(index)).split(os.sep)[-1]).completeSuffix().toLower() in acceptedSuffix:
                     selection.append(unicode(self.filePath(index)))
                 else:
                     for path, dirs, files in os.walk(unicode(self.filePath(index))):
                         for filename in files:
-                            if QtCore.QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
-                                if self.checkState(self.index(os.path.join(path, filename))) == QtCore.Qt.Checked:
+                            if QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
+                                if self.checkState(self.index(os.path.join(path, filename))) == Qt.Checked:
                                     try:
                                         selection.append(os.path.join(path, filename))
                                     except:
@@ -132,21 +132,21 @@ class MainWindow(base, form):
         self.tabWidgetRoot.setCurrentWidget(self.tab_computer)
 
         self.files = []
+        self.selected_file_types = {}
         self.scanButton.clicked.connect(self.scan)
 
         self.fileTypesButton.clicked.connect(self.select_file_types)
 
     def scan(self):
-        self.model.exportChecked()
+        print(self.selected_file_types)
 
     def select_file_types(self):
         dialog = FileTypes(self)
         dialog.show()
 
-
     def select_folder(self, folder=None):
         if not folder:
-            folder = unicode(QtGui.QFileDialog.getExistingDirectory(self, "Select Directory"))
+            folder = unicode(QFileDialog.getExistingDirectory(self, "Select Directory"))
             #self.add_to_tree(folder)
 
 
@@ -161,43 +161,68 @@ class FileTypes(base2, form2):
                            "Movies": ["avi", "mkv", "mov", "mp4"],
                            "Documents": ["doc", "docx", "xls", "xlsx", "ppt", "pptx"],
                            "Music": ["mp3", "wav"]}
-        self.model = CheckableFileTypes()
-        self.model.setHorizontalHeaderItem(0, QtGui.QStandardItem(""))
+        self.model = QStandardItemModel()
+        self.model.itemChanged.connect(self.on_item_changed)
+        self.model.setHorizontalHeaderItem(0, QStandardItem(""))
+        parent.selected_file_types = {12:12}
+        QObject.connect(self.okCancelBox, SIGNAL("accepted()"), lambda parent_window=parent: self.submit_file_types(parent_window))
+        QObject.connect(self.okCancelBox, SIGNAL("rejected()"), self.close)
+
+        #putting
         for cat, types in self.categories.items():
-            catItem = QtGui.QStandardItem(cat)
+            catItem = QStandardItem(cat)
             catItem.setCheckable(True)
             for type in types:
-                typeItem = QtGui.QStandardItem(type)
+                typeItem = QStandardItem(type)
                 typeItem.setCheckable(True)
                 catItem.appendRow(typeItem)
             self.model.appendRow(catItem)
         self.treeView.setModel(self.model)
-        self.model.itemChanged.connect(self.item_changet)
-        #QtGui.QDialogButtonBox
-        QtCore.QObject.connect(self.okCancelBox,QtCore.SIGNAL("accepted()"), self.submit_file_types)
-        QtCore.QObject.connect(self.okCancelBox,QtCore.SIGNAL("rejected()"), self.submit_file_types)
-        #self.okCanselBox.accepted(self.submit_file_types())
 
-    def item_changet(self, item):
-        print(item)
+    def quit(self, event):
+        self.close()
 
-    def submit_file_types(self):
-        print(self.model.exportChecked())
+    def on_item_changed(self, item):
+        if item.checkState() == Qt.Checked:
+            if item.hasChildren():
+                for row in range(item.rowCount()):
+                    item.child(row).setCheckState(Qt.Checked)
+            else:
+                item.parent().setCheckState(Qt.PartiallyChecked)
 
-    def select_category(self, index):
-        print(self.model_category.itemFromIndex(index))
-        print(self.model_category.itemFromIndex(index.child(0, 0)))
-        print(self.model_category.itemFromIndex(index.child(10, 0)))
-        i = 0
-        child = self.model_category.itemFromIndex(index.child(i, 0))
-        while child:
-            self.model_types.appendRow(child)
-            i += 1
-            child = self.model_category.itemFromIndex(index.child(i, 0))
+        elif item.checkState() == Qt.Unchecked:
+            if item.hasChildren():
+                for row in range(item.rowCount()):
+                    item.child(row).setCheckState(Qt.Unchecked)
+            else:
+                children = range(item.parent().rowCount())
+                children.pop(item.index().row())
+                for row in children:
+                    if item.parent().child(row).checkState():
+                        return
+                item.parent().setCheckState(Qt.Unchecked)
 
+
+    def submit_file_types(self, parent_window):
+        checked = {}
+        root = self.model.invisibleRootItem()
+
+        for num_cat in range(root.rowCount()):
+            category = root.child(num_cat, 0)
+            for num_type in range(category.rowCount()):
+                if category.child(num_type, 0).checkState() == Qt.Checked:
+                    try:
+                        checked[category.text()].append(category.child(num_type, 0).text())
+                    except KeyError:
+                        checked.update({category.text(): [category.child(num_type, 0).text()]})
+        parent_window.selected_file_types = checked
+        self.close()
+
+    def get_selected_file_types(self):
+        return self.selected_file_types
 
 if __name__ == '__main__':
-    app = QtGui.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
