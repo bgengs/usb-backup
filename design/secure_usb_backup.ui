@@ -57,43 +57,9 @@
            </font>
           </property>
           <property name="text">
-           <string>Files found</string>
+           <string>Computer structure</string>
           </property>
          </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QPushButton" name="foldersButton">
-          <property name="text">
-           <string>Folders</string>
-          </property>
-         </widget>
-        </item>
-        <item row="2" column="1">
-         <widget class="QPushButton" name="fileTypesButton">
-          <property name="text">
-           <string>File types</string>
-          </property>
-         </widget>
-        </item>
-        <item row="3" column="1">
-         <widget class="QPushButton" name="scanButton">
-          <property name="text">
-           <string>Scan</string>
-          </property>
-         </widget>
-        </item>
-        <item row="4" column="1">
-         <spacer name="verticalSpacerComputer">
-          <property name="orientation">
-           <enum>Qt::Vertical</enum>
-          </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>242</height>
-           </size>
-          </property>
-         </spacer>
         </item>
         <item row="7" column="0">
          <widget class="QProgressBar" name="progressBarScan">
@@ -119,15 +85,41 @@
         <item row="1" column="0" rowspan="6">
          <widget class="QTreeView" name="treeViewComputer"/>
         </item>
+        <item row="1" column="1">
+         <widget class="QPushButton" name="fileTypesButton">
+          <property name="text">
+           <string>File types</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="QPushButton" name="scanButton">
+          <property name="text">
+           <string>Scan</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <spacer name="verticalSpacerComputer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>242</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
        </layout>
        <zorder>filesFoundLabel</zorder>
-       <zorder>foldersButton</zorder>
-       <zorder>fileTypesButton</zorder>
-       <zorder>scanButton</zorder>
        <zorder>backupScanButton</zorder>
        <zorder>helpButton</zorder>
        <zorder>progressBarScan</zorder>
        <zorder>treeViewComputer</zorder>
+       <zorder>fileTypesButton</zorder>
+       <zorder>scanButton</zorder>
       </widget>
       <widget class="QWidget" name="tab_storage">
        <attribute name="title">
