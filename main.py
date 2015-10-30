@@ -1,6 +1,6 @@
 import sys, os, json
 from PyQt4 import uic
-from PyQt4.QtGui import QStandardItemModel, QStandardItem, QApplication, QInputDialog
+from PyQt4.QtGui import QStandardItemModel, QStandardItem, QApplication, QInputDialog, QMenu
 from PyQt4.QtCore import Qt, QObject, SIGNAL
 from checkable_dir import CheckableDirModel
 
@@ -44,8 +44,12 @@ class FileTypes(base2, form2):
 
         QObject.connect(self.okCancelBox, SIGNAL("accepted()"), lambda parent_window=parent: self.submit_file_types(parent_window))
         QObject.connect(self.okCancelBox, SIGNAL("rejected()"), self.close)
-        self.newCategButton.clicked.connect(self.add_category)
-        self.newTypeButton.clicked.connect(self.add_type)
+        QObject.connect(self.saveButton, SIGNAL("clicked()"), lambda parent_window=parent: self.save(parent_window))
+        #self.saveButton.clicked.connect(lambda parent_window=parent: self.save(parent_window))
+
+        self.treeView.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.treeView.customContextMenuRequested.connect(self.openMenu)
+
 
     def model_init(self, parent_window):
         categories = parent_window.selected_file_types
@@ -102,6 +106,23 @@ class FileTypes(base2, form2):
         parent_window.selected_file_types = categories
         self.close()
 
+    def openMenu(self, position):
+
+        level = 0
+        index = self.treeView.selectedIndexes()[0]
+        while index.parent().isValid():
+            index = index.parent()
+            level += 1
+
+        menu = QMenu()
+        if level == 0:
+            menu.addAction(self.tr("Add category"), self.add_category)
+            menu.addAction(self.tr("Add type"), self.add_type)
+        elif level == 1:
+            menu.addAction(self.tr("Add type"), self.add_type)
+
+        menu.exec_(self.treeView.viewport().mapToGlobal(position))
+
     def add_category(self):
         text, ok = QInputDialog.getText(self, 'Create new category', 'Category name:')
         if ok:
@@ -115,8 +136,16 @@ class FileTypes(base2, form2):
         if ok:
             catType = QStandardItem(text)
             catType.setCheckable(True)
-            selection = self.treeView.selectedIndexes()[0]
-            self.model.itemFromIndex(selection).appendRow(catType)
+            index = self.treeView.selectedIndexes()[0]
+            if self.model.itemFromIndex(index).hasChildren():
+                self.model.itemFromIndex(index).appendRow(catType)
+            else:
+                self.model.itemFromIndex(index).parent().appendRow(catType)
+
+    def save(self, parent):
+        self.submit_file_types(parent)
+        with open('categories.json', 'w') as f:
+            json.dump(parent.selected_file_types, f)
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
