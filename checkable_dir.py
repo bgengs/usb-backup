@@ -1,5 +1,6 @@
 from PyQt4.QtGui import QDirModel
-from PyQt4.QtCore import Qt, QFileInfo
+from PyQt4.QtCore import Qt, QFileInfo, QModelIndex
+import os
 
 def are_parent_and_child(parent, child):
     while child.isValid():
@@ -12,9 +13,10 @@ class CheckableDirModel(QDirModel):
     def __init__(self, parent=None):
         QDirModel.__init__(self, None)
         self.checks = {}
+        self.childs = 0
+        self.checked = 0
 
     def data(self, index, role=Qt.DisplayRole):
-        #print("data")
         if role == Qt.CheckStateRole and index.column() == 0:
             return self.checkState(index)
         return QDirModel.data(self, index, role)
@@ -31,32 +33,60 @@ class CheckableDirModel(QDirModel):
         return Qt.Unchecked
 
     def setData(self, index, value, role):
-        print("setdata")
         if role == Qt.CheckStateRole and index.column() == 0:
             self.layoutAboutToBeChanged.emit()
             for i, v in self.checks.items():
                 if are_parent_and_child(index, i):
                     self.checks.pop(i)
             self.checks[index] = value
+            #self.childCount(index)
             self.layoutChanged.emit()
             return True
 
         return QDirModel.setData(self, index, value, role)
 
-    def exportChecked(self, acceptedSuffix=['jpg', 'png', 'bmp']):
-        selection = []
-        for index in self.checks.keys():
-            if self.checks[index] == Qt.Checked:
+    def childCount(self, index):
+        self.childs += 1
+        i = 0
+        child = index.child(i, 0)
+        if self.filePath(child):
+            print(self.filePath(child))
+            self.childCount(child)
+        while self.filePath(child):
+            i += 1
+            child = index.child(i, 0)
+            if self.filePath(child):
+                print(self.filePath(child))
+                self.childCount(child)
+
+    def checkedCount(self, index=QModelIndex()):
+        if self.checkState(index) == Qt.Checked:
+            self.checked += 1
+        i = 0
+        child = self.index(i, 0, index)
+        if self.filePath(child):
+            self.checkedCount(child)
+        while self.filePath(child):
+            i += 1
+            child = self.index(i, 0, index)
+            if self.filePath(child):
+                self.checkedCount(child)
+        return self.checked
+
+    def exportChecked(self, dirs=[], acceptedSuffix=['jpg', 'png', 'bmp'], found=[]):
+        if not dirs:
+            dirs = self.checks
+        for index in dirs.keys():
+            if dirs[index] == Qt.Checked:
                 if os.path.isfile(unicode(self.filePath(index))):
-                    #if QtCore.QFileInfo(unicode(self.filePath(index)).split(os.sep)[-1]).completeSuffix().toLower() in acceptedSuffix:
-                    selection.append(unicode(self.filePath(index)))
+                    found.append(unicode(self.filePath(index)))
                 else:
                     for path, dirs, files in os.walk(unicode(self.filePath(index))):
                         for filename in files:
                             if QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
                                 if self.checkState(self.index(os.path.join(path, filename))) == Qt.Checked:
                                     try:
-                                        selection.append(os.path.join(path, filename))
+                                        found.append(os.path.join(path, filename))
                                     except:
                                         pass
-        return selection
+        print("ended")
