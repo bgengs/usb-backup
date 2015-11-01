@@ -40,6 +40,7 @@ class FileTypes(base2, form2):
                 catItem.appendRow(typeItem)
             self.model.appendRow(catItem)
         self.treeView.setModel(self.model)
+        self.submit_file_types(parent_window)
 
     def quit(self):
         self.close()

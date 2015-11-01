@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QDirModel
+from PyQt4.QtGui import QDirModel, QLabel
 from PyQt4.QtCore import Qt, QFileInfo, QModelIndex
 import os
 
@@ -73,7 +73,7 @@ class CheckableDirModel(QDirModel):
                 self.checkedCount(child)
         return self.checked
 
-    def exportChecked(self, dirs=[], acceptedSuffix=['jpg', 'png', 'bmp'], found=[]):
+    def exportChecked(self, lock, dirs={}, acceptedSuffix=['jpg', 'png', 'bmp'], found=[]):
         if not dirs:
             dirs = self.checks
         for index in dirs.keys():
@@ -85,8 +85,6 @@ class CheckableDirModel(QDirModel):
                         for filename in files:
                             if QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
                                 if self.checkState(self.index(os.path.join(path, filename))) == Qt.Checked:
-                                    try:
-                                        found.append(os.path.join(path, filename))
-                                    except:
-                                        pass
+                                    found.append(os.path.join(path, filename))
+
         print("ended")
