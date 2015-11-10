@@ -1,0 +1,8 @@
+test.py
+*.pyc
+*.pro
+*.cpp
+*.h
+tree.py
+design/file_types_dialog.py
+chekable.py
