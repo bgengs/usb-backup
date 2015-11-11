@@ -3,10 +3,11 @@ from os import path, sep, mkdir
 import crypto
 from shutil import copy2
 from PyQt4 import uic
-from PyQt4.QtGui import QApplication, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QMenu
+from PyQt4.QtGui import QApplication, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView
 from PyQt4.QtCore import Qt
 from checkable_dir import CheckableDirModel
 from file_types_window import FileTypes
+from new_storage_dialog import NewStorage
 from threading import Thread, Lock
 from time import sleep
 from checkable_storage import Model as StorageModel
@@ -27,6 +28,8 @@ class MainWindow(base, form):
 
         # some staff
         self.system_encoding = sys.getfilesystemencoding()
+        self.password = ''
+        self.selected_storage = ''
         self.files = {}
         self.selected_file_types = {}
         self.lock = Lock()
@@ -35,6 +38,7 @@ class MainWindow(base, form):
         self.model_storage = StorageModel()
         if not path.exists(path.dirname(path.abspath(__file__)) + sep + "All BackUps"):
             mkdir(path.dirname(path.abspath(__file__)) + sep + "All BackUps")
+        self.current_dir = path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "All BackUps" + sep
         self.model_storage.setRootPath(path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "All BackUps")
         self.treeViewStorage.setModel(self.model_storage)
         self.treeViewStorage.setRootIndex(self.model_storage.index(self.model_storage.rootPath()))
@@ -43,15 +47,15 @@ class MainWindow(base, form):
         self.treeViewStorage.setColumnWidth(0, 200)
         self.treeViewStorage.setColumnWidth(1, 80)
         self.treeViewStorage.setColumnWidth(2, 80)
-        self.treeViewStorage.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.treeViewStorage.customContextMenuRequested.connect(self.openMenu)
+
 
         # buttons
         self.scanButton.clicked.connect(self.scan)
         self.fileTypesButton.clicked.connect(self.select_file_types)
         self.backupButtonComp.clicked.connect(self.backup)
         self.backupButtonStorage.clicked.connect(self.backup)
-        self.tabWidgetRoot.setCurrentWidget(self.tab_computer)
+        self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
+        self.newStorageButton.clicked.connect(self.add_storage)
 
     def scan(self):
         self.treeViewComputer.setEnabled(False)
@@ -96,41 +100,49 @@ class MainWindow(base, form):
     def backup(self):
         try:
             selected = self.treeViewStorage.selectedIndexes()[0]
-            warehouse = self.model_storage.filePath(selected).split('/')[-1]
-            #print(self.model_storage.filePath(selected).split('/')[-1])
-            key, ok = QInputDialog.getText(self,
-                            "Key",
-                            "Enter key for <b>%s</b> storage" % warehouse,
-                            mode=QLineEdit.Password)
-            if ok: # and hash(key) == hash from storage
+            warehouse = str(self.model_storage.filePath(selected).split('/')[-1])
+            key_from_storage = open(self.current_dir + warehouse + sep + "key.txt", 'r').read()
+
+            if self.selected_storage == warehouse and self.password == key_from_storage:
                 for category, files in self.files.items():
-                    current_dir = path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep \
-                                  + "All BackUps" + sep + warehouse + sep + category
+                    current_dir = self.current_dir + warehouse + sep + category
                     if not path.exists(current_dir):
                         mkdir(current_dir)
                     for _file in files:
                         copy2(_file, current_dir)
+            else:
+                key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % warehouse,
+                                               mode=QLineEdit.Password)
+                if ok:
+                    if key == key_from_storage: # and hash(key) == hash from key.txt
+                        for category, files in self.files.items():
+                            current_dir = self.current_dir + warehouse + sep + category
+                            if not path.exists(current_dir):
+                                mkdir(current_dir)
+                            for _file in files:
+                                copy2(_file, current_dir)
+                    else:
+                        QMessageBox.about(self, "Error", "Incorrect password!")
 
         except IndexError:
-            QMessageBox.about(self, "Error", "Select the storage before creating backup!")
-            self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
+            if self.selected_storage:
+                key_from_storage = open(self.current_dir + self.selected_storage + sep + "key.txt", 'r').read()
+                if self.password == key_from_storage:
+                    for category, files in self.files.items():
+                        current_dir = self.current_dir + self.selected_storage + sep + category
+                        if not path.exists(current_dir):
+                            mkdir(current_dir)
+                        for _file in files:
+                            copy2(_file, current_dir)
+            else:
+                QMessageBox.about(self, "Error", "Select the storage before creating backup!")
+                self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
 
-    def openMenu(self, position):
-        level = 0
-        index = self.treeViewStorage.selectedIndexes()[0]
-        while index.parent().isValid():
-            index = index.parent()
-            level += 1
-
-        menu = QMenu()
-        #if level == 0:
-        menu.addAction(self.tr("Add storage"), self.add_storage)
-
-
-        menu.exec_(self.treeViewStorage.viewport().mapToGlobal(position))
 
     def add_storage(self):
-        pass
+        dialog = NewStorage(self)
+        dialog.show()
+
 
     def select_file_types(self):
         dialog = FileTypes(self)

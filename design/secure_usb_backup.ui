@@ -132,13 +132,6 @@
           </property>
          </spacer>
         </item>
-        <item row="3" column="1">
-         <widget class="QPushButton" name="newStorageButton">
-          <property name="text">
-           <string>New storage</string>
-          </property>
-         </widget>
-        </item>
         <item row="0" column="0">
          <widget class="QLabel" name="storageStructLabel">
           <property name="font">
@@ -172,13 +165,20 @@
           </property>
          </widget>
         </item>
-        <item row="1" column="0" rowspan="5">
-         <widget class="QTreeView" name="treeViewStorage"/>
-        </item>
         <item row="5" column="1">
          <widget class="QPushButton" name="helpButtonStorage">
           <property name="text">
            <string>Help</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0" rowspan="5">
+         <widget class="QTreeView" name="treeViewStorage"/>
+        </item>
+        <item row="3" column="1">
+         <widget class="QPushButton" name="newStorageButton">
+          <property name="text">
+           <string>New storage</string>
           </property>
          </widget>
         </item>
