@@ -31,7 +31,7 @@ class NewStorage(base, form):
             parent.password = self.passLine.text()
             parent.selected_storage = str(self.storageNameLine.text())
             index = parent.model_storage.index(current_dir)
-            print(unicode(parent.model_storage.filePath(index)))
             #parent.treeViewStorage.setSelection(index, QItemSelectionModel.NoUpdate)
             parent.treeViewStorage.setCurrentIndex(index)
             self.close()
+

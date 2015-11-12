@@ -1,4 +1,4 @@
-import sys
+import sys, datetime
 from os import path, sep, mkdir
 import crypto
 from shutil import copy2
@@ -54,14 +54,18 @@ class MainWindow(base, form):
         self.fileTypesButton.clicked.connect(self.select_file_types)
         self.backupButtonComp.clicked.connect(self.backup)
         self.backupButtonStorage.clicked.connect(self.backup)
-        self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
+        #self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
         self.newStorageButton.clicked.connect(self.add_storage)
+        self.helpButtonComputer.clicked.connect(self.help)
+
+    def help(self):
+        print(self.selected_file_types)
 
     def scan(self):
         self.treeViewComputer.setEnabled(False)
         self.backupButtonComp.setEnabled(False)
         self.fileTypesButton.setEnabled(False)
-
+        self.files = {}
         if not self.selected_file_types:
             dialog = FileTypes(self)
             dialog.show()
@@ -99,13 +103,22 @@ class MainWindow(base, form):
 
     def backup(self):
         try:
-            selected = self.treeViewStorage.selectedIndexes()[0]
-            warehouse = str(self.model_storage.filePath(selected).split('/')[-1])
+            selected_index = self.treeViewStorage.selectedIndexes()[0]
+            selected_path = self.model_storage.filePath(selected_index).split('/')[::-1]
+            warehouse = ''
+            for i, dir in enumerate(selected_path):
+                if dir == "All BackUps":
+                    warehouse = str(selected_path[i-1])
+
+            #print(str(self.model_storage.filePath(selected_index).split('/')))
+            #warehouse = str(self.model_storage.filePath(selected_index).split('/')[-1])
             key_from_storage = open(self.current_dir + warehouse + sep + "key.txt", 'r').read()
 
             if self.selected_storage == warehouse and self.password == key_from_storage:
+                now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
+                mkdir(self.current_dir + warehouse + sep + now_date + sep)
                 for category, files in self.files.items():
-                    current_dir = self.current_dir + warehouse + sep + category
+                    current_dir = self.current_dir + warehouse + sep + now_date + sep + category
                     if not path.exists(current_dir):
                         mkdir(current_dir)
                     for _file in files:
@@ -115,8 +128,10 @@ class MainWindow(base, form):
                                                mode=QLineEdit.Password)
                 if ok:
                     if key == key_from_storage: # and hash(key) == hash from key.txt
+                        now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
+                        mkdir(self.current_dir + warehouse + sep + now_date + sep)
                         for category, files in self.files.items():
-                            current_dir = self.current_dir + warehouse + sep + category
+                            current_dir = self.current_dir + warehouse + sep + now_date + sep + category
                             if not path.exists(current_dir):
                                 mkdir(current_dir)
                             for _file in files:
@@ -128,8 +143,10 @@ class MainWindow(base, form):
             if self.selected_storage:
                 key_from_storage = open(self.current_dir + self.selected_storage + sep + "key.txt", 'r').read()
                 if self.password == key_from_storage:
+                    now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
+                    mkdir(self.current_dir + self.selected_storage + sep + now_date + sep)
                     for category, files in self.files.items():
-                        current_dir = self.current_dir + self.selected_storage + sep + category
+                        current_dir = self.current_dir + self.selected_storage + sep + now_date + sep + category
                         if not path.exists(current_dir):
                             mkdir(current_dir)
                         for _file in files:
@@ -137,7 +154,8 @@ class MainWindow(base, form):
             else:
                 QMessageBox.about(self, "Error", "Select the storage before creating backup!")
                 self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
-
+        except WindowsError:
+            QMessageBox.about(self, "Error", "Too little time for previous backup!\nWait a minute, please.")
 
     def add_storage(self):
         dialog = NewStorage(self)

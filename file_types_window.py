@@ -129,3 +129,5 @@ class FileTypes(base2, form2):
         else:
             parent = self.model.invisibleRootItem()
             self.model.removeRow(index.row(), parent.index())
+
+#TODO: uncheced types is still backups
