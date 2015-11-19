@@ -1,6 +1,5 @@
-import sys, datetime
-from os import path, sep, mkdir
-import crypto
+import sys, datetime, random
+from os import path, sep, mkdir, walk
 from shutil import copy2
 from PyQt4 import uic
 from PyQt4.QtGui import QApplication, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView
@@ -11,6 +10,10 @@ from new_storage_dialog import NewStorage
 from threading import Thread, Lock
 from time import sleep
 from checkable_storage import Model as StorageModel
+from Crypto.Hash import SHA256
+from Crypto.Cipher import AES
+from struct import pack, unpack
+
 
 base, form = uic.loadUiType("design"+sep+"secure_usb_backup.ui")
 class MainWindow(base, form):
@@ -29,6 +32,7 @@ class MainWindow(base, form):
         # some staff
         self.system_encoding = sys.getfilesystemencoding()
         self.password = ''
+        self.padding = 'eWSxmr3eARFzhuFV'
         self.selected_storage = ''
         self.files = {}
         self.selected_file_types = {}
@@ -36,10 +40,10 @@ class MainWindow(base, form):
         self.threads = []
 
         self.model_storage = StorageModel()
-        if not path.exists(path.dirname(path.abspath(__file__)) + sep + "All BackUps"):
-            mkdir(path.dirname(path.abspath(__file__)) + sep + "All BackUps")
-        self.current_dir = path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "All BackUps" + sep
-        self.model_storage.setRootPath(path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "All BackUps")
+        if not path.exists(path.dirname(path.abspath(__file__)) + sep + "Backups"):
+            mkdir(path.dirname(path.abspath(__file__)) + sep + "Backups")
+        self.current_dir = path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "Backups" + sep
+        self.model_storage.setRootPath(path.dirname(path.abspath(__file__)).decode(self.system_encoding) + sep + "Backups")
         self.treeViewStorage.setModel(self.model_storage)
         self.treeViewStorage.setRootIndex(self.model_storage.index(self.model_storage.rootPath()))
         self.treeViewStorage.setIndentation(10)
@@ -47,8 +51,14 @@ class MainWindow(base, form):
         self.treeViewStorage.setColumnWidth(0, 200)
         self.treeViewStorage.setColumnWidth(1, 80)
         self.treeViewStorage.setColumnWidth(2, 80)
+        #self.treeViewStorage.setItemsExpandable(False)
+        """
+        (_, storages, _) = next(walk(self.current_dir))
+        for storage in storages:
+            self.treeViewStorage.setExpanded(self.model_storage.index(self.current_dir + storage), False)
+            """
 
-
+        #self.treeViewStorage(self.model_storage.index(self.current_dir + "AlexeyPC"), False)
         # buttons
         self.scanButton.clicked.connect(self.scan)
         self.fileTypesButton.clicked.connect(self.select_file_types)
@@ -101,56 +111,66 @@ class MainWindow(base, form):
         self.backupButtonComp.setEnabled(True)
         self.fileTypesButton.setEnabled(True)
 
+    def encrypt_and_save_to(self, warehouse):
+        now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
+        mkdir(self.current_dir + warehouse + sep + now_date + sep)
+        for category, files in self.files.items():
+            current_dir = self.current_dir + warehouse + sep + now_date + sep + category + sep
+            if not path.exists(current_dir):
+                mkdir(current_dir)
+            for file_path in files:
+                file_name = file_path.split(sep)[-1]
+                with open(file_path, 'rb') as reader, open(current_dir+file_name, 'ab') as writer:
+
+                    chunksize=64*1024*16
+                    iv = ''.join(chr(random.randint(0, 0xFF)) for _ in range(16))
+                    cipher = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
+                    filesize = path.getsize(file_path)
+
+                    writer.write(pack('<Q', filesize))
+                    writer.write(iv)
+                    writer.write(pack('<B', len(file_path)))
+                    writer.write(file_path)
+
+                    part = reader.read(chunksize)
+                    while part:
+                        if len(part) % 16 != 0:
+                            part += ' ' * (16 - len(part) % 16)
+                        ciphertext = cipher.encrypt(part)
+                        writer.write(ciphertext)
+                        part = reader.read(chunksize)
+
+
     def backup(self):
         try:
             selected_index = self.treeViewStorage.selectedIndexes()[0]
             selected_path = self.model_storage.filePath(selected_index).split('/')[::-1]
             warehouse = ''
             for i, dir in enumerate(selected_path):
-                if dir == "All BackUps":
+                if dir == "Backups":
                     warehouse = str(selected_path[i-1])
 
-            #print(str(self.model_storage.filePath(selected_index).split('/')))
-            #warehouse = str(self.model_storage.filePath(selected_index).split('/')[-1])
-            key_from_storage = open(self.current_dir + warehouse + sep + "key.txt", 'r').read()
+            hash_from_storage = open(self.current_dir + warehouse + sep + "hash", 'r').read()
+            hash_from_user = SHA256.new(self.password+self.padding[len(self.password):]).hexdigest()
+            if self.selected_storage == warehouse and hash_from_user == hash_from_storage:
+                self.encrypt_and_save_to(warehouse)
 
-            if self.selected_storage == warehouse and self.password == key_from_storage:
-                now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
-                mkdir(self.current_dir + warehouse + sep + now_date + sep)
-                for category, files in self.files.items():
-                    current_dir = self.current_dir + warehouse + sep + now_date + sep + category
-                    if not path.exists(current_dir):
-                        mkdir(current_dir)
-                    for _file in files:
-                        copy2(_file, current_dir)
             else:
                 key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % warehouse,
                                                mode=QLineEdit.Password)
                 if ok:
-                    if key == key_from_storage: # and hash(key) == hash from key.txt
-                        now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
-                        mkdir(self.current_dir + warehouse + sep + now_date + sep)
-                        for category, files in self.files.items():
-                            current_dir = self.current_dir + warehouse + sep + now_date + sep + category
-                            if not path.exists(current_dir):
-                                mkdir(current_dir)
-                            for _file in files:
-                                copy2(_file, current_dir)
+                    hash_from_user = SHA256.new(key+self.padding[len(key):]).hexdigest()
+                    if hash_from_user == hash_from_storage:
+                        self.encrypt_and_save_to(warehouse)
                     else:
                         QMessageBox.about(self, "Error", "Incorrect password!")
 
         except IndexError:
             if self.selected_storage:
-                key_from_storage = open(self.current_dir + self.selected_storage + sep + "key.txt", 'r').read()
-                if self.password == key_from_storage:
-                    now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
-                    mkdir(self.current_dir + self.selected_storage + sep + now_date + sep)
-                    for category, files in self.files.items():
-                        current_dir = self.current_dir + self.selected_storage + sep + now_date + sep + category
-                        if not path.exists(current_dir):
-                            mkdir(current_dir)
-                        for _file in files:
-                            copy2(_file, current_dir)
+                hash_from_storage = open(self.current_dir + self.selected_storage + sep + "hash", 'r').read()
+                hash_from_user = SHA256.new(self.password+self.padding[len(self.password):]).hexdigest()
+                if hash_from_user == hash_from_storage:
+                    self.encrypt_and_save_to(self.selected_storage)
             else:
                 QMessageBox.about(self, "Error", "Select the storage before creating backup!")
                 self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
@@ -161,7 +181,6 @@ class MainWindow(base, form):
         dialog = NewStorage(self)
         dialog.show()
 
-
     def select_file_types(self):
         dialog = FileTypes(self)
         dialog.show()
@@ -171,3 +190,6 @@ if __name__ == '__main__':
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
+            #print(str(self.model_storage.filePath(selected_index).split('/')))
+            #warehouse = str(self.model_storage.filePath(selected_index).split('/')[-1])

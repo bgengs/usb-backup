@@ -38,5 +38,6 @@ class Model(QFileSystemModel):
         return QFileSystemModel.setData(self, index, value, role)
 
     def flags(self, QModelIndex):
+
         return Qt.ItemIsUserCheckable | QFileSystemModel.flags(self, QModelIndex)
 

@@ -2,6 +2,7 @@ from PyQt4 import uic
 from PyQt4.QtGui import QLineEdit, QLabel, QPalette, QItemSelectionModel
 from PyQt4.QtCore import Qt, QObject, SIGNAL, QRect
 from os import sep, path, mkdir
+from Crypto.Hash import SHA256
 
 base, form = uic.loadUiType("design"+sep+"new_storage_dialog.ui")
 class NewStorage(base, form):
@@ -27,11 +28,11 @@ class NewStorage(base, form):
         else:
             current_dir = parent.current_dir + str(self.storageNameLine.text())
             mkdir(current_dir)
-            open(current_dir + sep + "key.txt", 'w').write(self.passLine.text())
+            password = self.passLine.text()+parent.padding[len(self.passLine.text()):]
+            open(current_dir + sep + "hash", 'w').write(SHA256.new(password).hexdigest())
             parent.password = self.passLine.text()
             parent.selected_storage = str(self.storageNameLine.text())
             index = parent.model_storage.index(current_dir)
             #parent.treeViewStorage.setSelection(index, QItemSelectionModel.NoUpdate)
             parent.treeViewStorage.setCurrentIndex(index)
             self.close()
-
