@@ -1,5 +1,5 @@
 import sys, datetime, random
-from os import path, sep, mkdir, walk
+from os import path, sep, mkdir, walk, remove
 from shutil import copy2
 from PyQt4 import uic
 from PyQt4.QtGui import QApplication, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView
@@ -12,7 +12,7 @@ from time import sleep
 from checkable_storage import Model as StorageModel
 from Crypto.Hash import SHA256
 from Crypto.Cipher import AES
-from struct import pack, unpack
+from struct import pack, unpack, calcsize
 
 
 base, form = uic.loadUiType("design"+sep+"secure_usb_backup.ui")
@@ -72,9 +72,9 @@ class MainWindow(base, form):
         print(self.selected_file_types)
 
     def scan(self):
-        self.treeViewComputer.setEnabled(False)
+        #self.treeViewComputer.setEnabled(False)
         self.backupButtonComp.setEnabled(False)
-        self.fileTypesButton.setEnabled(False)
+        #self.fileTypesButton.setEnabled(False)
         self.files = {}
         if not self.selected_file_types:
             dialog = FileTypes(self)
@@ -97,6 +97,7 @@ class MainWindow(base, form):
                     self.threads.append(th)
 
         status = map(Thread.isAlive, self.threads)
+        '''
         while any(status):
             status = map(Thread.isAlive, self.threads)
             sleep(.5)
@@ -105,11 +106,46 @@ class MainWindow(base, form):
             self.filesFoundLabel.setText("Scaning..")
             sleep(.5)
             self.filesFoundLabel.setText("Scaning...")
+        '''
         self.filesFoundLabel.setText("Scaning finished! Files found %s" % sum(len(v) for k, v in self.files.items()))
 
-        self.treeViewComputer.setEnabled(True)
+        #self.treeViewComputer.setEnabled(True)
         self.backupButtonComp.setEnabled(True)
-        self.fileTypesButton.setEnabled(True)
+        #self.fileTypesButton.setEnabled(True)
+
+    def is_exist(self, warehouse, file_path, category): # in warehouse
+        file_name = file_path.split(sep)[-1]
+        return_value = False
+        checked = False
+        for curdir, dirs, files in walk(self.current_dir + warehouse + sep):
+            if curdir.split(sep)[-1] == category:
+                for file in files:
+                    if file == file_name:
+                        decrypted = self.decrypt(curdir+sep+file)
+                        with open(decrypted, 'r') as dec, open(file_path, 'r') as new:
+                            existed = SHA256.new(dec.read())
+                            found = SHA256.new(new.read())
+                            if existed.hexdigest() == found.hexdigest():
+                                return_value = True
+                            checked = True
+        if checked:
+            remove(decrypted)
+        return return_value
+
+    def decrypt(self, file_path):
+        with open(file_path, 'r') as ciphered:
+            origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
+            iv = ciphered.read(16)
+            saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
+            decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
+            chunksize = 24*1024
+            with open(file_path+'.dec', 'wb') as outfile:
+                chunk = ciphered.read(chunksize)
+                while chunk:
+                    outfile.write(decryptor.decrypt(chunk))
+                    chunk = ciphered.read(chunksize)
+                outfile.truncate(origsize)
+        return file_path+'.dec'
 
     def encrypt_and_save_to(self, warehouse):
         now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
@@ -120,26 +156,28 @@ class MainWindow(base, form):
                 mkdir(current_dir)
             for file_path in files:
                 file_name = file_path.split(sep)[-1]
-                with open(file_path, 'rb') as reader, open(current_dir+file_name, 'ab') as writer:
+                if not self.is_exist(warehouse, file_path, category):
+                    with open(file_path, 'rb') as reader, open(current_dir+file_name, 'ab') as writer:
+                        chunksize=64*1024*16
+                        iv = ''.join(chr(random.randint(0, 0xFF)) for _ in range(16))
+                        cipher = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
+                        filesize = path.getsize(file_path)
 
-                    chunksize=64*1024*16
-                    iv = ''.join(chr(random.randint(0, 0xFF)) for _ in range(16))
-                    cipher = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
-                    filesize = path.getsize(file_path)
+                        writer.write(pack('<Q', filesize))
+                        writer.write(iv)
+                        writer.write(pack('<B', len(file_path)))
+                        writer.write(file_path)
 
-                    writer.write(pack('<Q', filesize))
-                    writer.write(iv)
-                    writer.write(pack('<B', len(file_path)))
-                    writer.write(file_path)
-
-                    part = reader.read(chunksize)
-                    while part:
-                        if len(part) % 16 != 0:
-                            part += ' ' * (16 - len(part) % 16)
-                        ciphertext = cipher.encrypt(part)
-                        writer.write(ciphertext)
                         part = reader.read(chunksize)
-
+                        while part:
+                            if len(part) % 16 != 0:
+                                part += ' ' * (16 - len(part) % 16)
+                            ciphertext = cipher.encrypt(part)
+                            writer.write(ciphertext)
+                            part = reader.read(chunksize)
+                else:
+                    with open(current_dir+file_name+'.link', 'w') as writer:
+                        writer.write(file_path)
 
     def backup(self):
         try:

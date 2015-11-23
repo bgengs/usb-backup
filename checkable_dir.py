@@ -79,12 +79,12 @@ class CheckableDirModel(QDirModel):
         for index in dirs.keys():
             if dirs[index] == Qt.Checked:
                 if os.path.isfile(unicode(self.filePath(index))):
-                    found[category].append(unicode(self.filePath(index)))
+                    found[category].append(os.path.normpath(unicode(self.filePath(index))))
                 else:
                     for path, dirs, files in os.walk(unicode(self.filePath(index))):
                         for filename in files:
                             if QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
                                 if self.checkState(self.index(os.path.join(path, filename))) == Qt.Checked:
-                                    found[category].append(os.path.join(path, filename))
+                                    found[category].append(os.path.normpath(os.path.join(path, filename)))
 
         print("ended")
