@@ -2,7 +2,7 @@ import sys, datetime, random
 from os import path, sep, mkdir, walk, remove
 from shutil import copy2
 from PyQt4 import uic
-from PyQt4.QtGui import QApplication, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView
+from PyQt4.QtGui import QApplication, qApp, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView, QProgressBar
 from PyQt4.QtCore import Qt
 from checkable_dir import CheckableDirModel
 from file_types_window import FileTypes
@@ -51,14 +51,9 @@ class MainWindow(base, form):
         self.treeViewStorage.setColumnWidth(0, 200)
         self.treeViewStorage.setColumnWidth(1, 80)
         self.treeViewStorage.setColumnWidth(2, 80)
-        #self.treeViewStorage.setItemsExpandable(False)
-        """
-        (_, storages, _) = next(walk(self.current_dir))
-        for storage in storages:
-            self.treeViewStorage.setExpanded(self.model_storage.index(self.current_dir + storage), False)
-            """
+        self.progressBarBackup.setMinimum(0)
+        self.progressBarBackup.setValue(0)
 
-        #self.treeViewStorage(self.model_storage.index(self.current_dir + "AlexeyPC"), False)
         # buttons
         self.scanButton.clicked.connect(self.scan)
         self.fileTypesButton.clicked.connect(self.select_file_types)
@@ -97,16 +92,13 @@ class MainWindow(base, form):
                     self.threads.append(th)
 
         status = map(Thread.isAlive, self.threads)
-        '''
+
         while any(status):
             status = map(Thread.isAlive, self.threads)
-            sleep(.5)
             self.filesFoundLabel.setText("Scaning.")
-            sleep(.5)
             self.filesFoundLabel.setText("Scaning..")
-            sleep(.5)
             self.filesFoundLabel.setText("Scaning...")
-        '''
+
         self.filesFoundLabel.setText("Scaning finished! Files found %s" % sum(len(v) for k, v in self.files.items()))
 
         #self.treeViewComputer.setEnabled(True)
@@ -118,36 +110,53 @@ class MainWindow(base, form):
         return_value = False
         checked = False
         for curdir, dirs, files in walk(self.current_dir + warehouse + sep):
+            print(curdir.split(sep)[-1], category)
             if curdir.split(sep)[-1] == category:
                 for file in files:
                     if file == file_name:
-                        decrypted = self.decrypt(curdir+sep+file)
-                        with open(decrypted, 'r') as dec, open(file_path, 'r') as new:
-                            existed = SHA256.new(dec.read())
-                            found = SHA256.new(new.read())
-                            if existed.hexdigest() == found.hexdigest():
-                                return_value = True
+                        decrypted = self.decrypt(curdir+sep+file, file_path)
+                        if decrypted:
+                            with open(decrypted, 'r') as dec, open(file_path, 'r') as new:
+                                existed = SHA256.new(dec.read())
+                                found = SHA256.new(new.read())
+                                if existed.hexdigest() == found.hexdigest():
+                                    return_value = True
                             checked = True
         if checked:
-            remove(decrypted)
+            try:
+                remove(decrypted)
+            except TypeError:
+                #print(curdir+sep+file, file_path, file, file_name, file==file_name)
+                #print(decrypted)
+                #print(checked)
+                #print(return_value)
+                return False
         return return_value
 
-    def decrypt(self, file_path):
-        with open(file_path, 'r') as ciphered:
-            origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
-            iv = ciphered.read(16)
-            saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
-            decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
-            chunksize = 24*1024
-            with open(file_path+'.dec', 'wb') as outfile:
-                chunk = ciphered.read(chunksize)
-                while chunk:
-                    outfile.write(decryptor.decrypt(chunk))
+    def decrypt(self, path_to_stor, parh_to_comp):
+        try:
+            with open(path_to_stor, 'rb') as ciphered:
+                origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
+                iv = ciphered.read(16)
+                saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
+                if saved_file_path != parh_to_comp:
+                    raise ValueError
+                decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
+                chunksize = 24*1024
+                with open(path_to_stor+'.dec', 'wb') as outfile:
                     chunk = ciphered.read(chunksize)
-                outfile.truncate(origsize)
-        return file_path+'.dec'
+                    while chunk:
+                        outfile.write(decryptor.decrypt(chunk))
+                        chunk = ciphered.read(chunksize)
+                    outfile.truncate(origsize)
+            return path_to_stor+'.dec'
+        except ValueError:  # it's other file with same name
+            return None
+
 
     def encrypt_and_save_to(self, warehouse):
+        files_count = sum(len(f) for f in self.files.values())
+        self.progressBarBackup.setMaximum(files_count)
         now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
         mkdir(self.current_dir + warehouse + sep + now_date + sep)
         for category, files in self.files.items():
@@ -178,6 +187,9 @@ class MainWindow(base, form):
                 else:
                     with open(current_dir+file_name+'.link', 'w') as writer:
                         writer.write(file_path)
+                qApp.processEvents()
+                self.progressBarBackup.setValue(self.progressBarBackup.value()+1)
+        self.progressBarBackup.setValue(self.progressBarBackup.maximum())
 
     def backup(self):
         try:
