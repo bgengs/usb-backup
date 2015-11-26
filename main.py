@@ -7,6 +7,7 @@ from PyQt4.QtCore import Qt
 from checkable_dir import CheckableDirModel
 from file_types_window import FileTypes
 from new_storage_dialog import NewStorage
+from restore_dialog import Restore_type
 from threading import Thread, Lock
 from time import sleep
 from checkable_storage import Model as StorageModel
@@ -34,10 +35,14 @@ class MainWindow(base, form):
         self.password = ''
         self.padding = 'eWSxmr3eARFzhuFV'
         self.selected_storage = ''
-        self.files = {}
+        self.files_found = {}
+        self.files_to_restore = {}
         self.selected_file_types = {}
         self.lock = Lock()
         self.threads = []
+        self.prev_or_spec = True  # True for restore to previous place, False for specifed
+        self.path_to_restore = u''
+        self.restore_ok = False
 
         self.model_storage = StorageModel()
         if not path.exists(path.dirname(path.abspath(__file__)) + sep + "Backups"):
@@ -62,15 +67,17 @@ class MainWindow(base, form):
         #self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
         self.newStorageButton.clicked.connect(self.add_storage)
         self.helpButtonComputer.clicked.connect(self.help)
+        self.restoreButton.clicked.connect(self.restore)
 
     def help(self):
-        print(self.selected_file_types)
+        print(self.prev_or_spec, self.path_to_restore)
 
     def scan(self):
         #self.treeViewComputer.setEnabled(False)
         self.backupButtonComp.setEnabled(False)
         #self.fileTypesButton.setEnabled(False)
-        self.files = {}
+        self.files_found = {}
+        self.threads = []
         if not self.selected_file_types:
             dialog = FileTypes(self)
             dialog.show()
@@ -82,24 +89,23 @@ class MainWindow(base, form):
                     selected.append(_type)
             if selected:
                 for index, state in self.model_computer.checks.items():
-                    self.files.update({element.keys()[0]: []})
+                    self.files_found.update({element.keys()[0]: []})
                     print("start tread for %s" % element.keys()[0])
                     th = Thread(target=self.model_computer.exportChecked, args=(self.lock,
                                                                        {index: state},
                                                                        element.keys()[0],
-                                                                       selected, self.files))
+                                                                       selected, self.files_found))
                     th.start()
                     self.threads.append(th)
 
         status = map(Thread.isAlive, self.threads)
 
         while any(status):
+            qApp.processEvents()
             status = map(Thread.isAlive, self.threads)
-            self.filesFoundLabel.setText("Scaning.")
-            self.filesFoundLabel.setText("Scaning..")
             self.filesFoundLabel.setText("Scaning...")
 
-        self.filesFoundLabel.setText("Scaning finished! Files found %s" % sum(len(v) for k, v in self.files.items()))
+        self.filesFoundLabel.setText("Scaning finished! Files found %s" % sum(len(v) for k, v in self.files_found.items()))
 
         #self.treeViewComputer.setEnabled(True)
         self.backupButtonComp.setEnabled(True)
@@ -114,7 +120,7 @@ class MainWindow(base, form):
             if curdir.split(sep)[-1] == category:
                 for file in files:
                     if file == file_name:
-                        decrypted = self.decrypt(curdir+sep+file, file_path)
+                        decrypted = self.decrypt_and_cmp(curdir + sep + file, file_path)
                         if decrypted:
                             with open(decrypted, 'r') as dec, open(file_path, 'r') as new:
                                 existed = SHA256.new(dec.read())
@@ -133,7 +139,7 @@ class MainWindow(base, form):
                 return False
         return return_value
 
-    def decrypt(self, path_to_stor, parh_to_comp):
+    def decrypt_and_cmp(self, path_to_stor, parh_to_comp):
         try:
             with open(path_to_stor, 'rb') as ciphered:
                 origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
@@ -155,11 +161,11 @@ class MainWindow(base, form):
 
 
     def encrypt_and_save_to(self, warehouse):
-        files_count = sum(len(f) for f in self.files.values())
+        files_count = sum(len(f) for f in self.files_found.values())
         self.progressBarBackup.setMaximum(files_count)
         now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
         mkdir(self.current_dir + warehouse + sep + now_date + sep)
-        for category, files in self.files.items():
+        for category, files in self.files_found.items():
             current_dir = self.current_dir + warehouse + sep + now_date + sep + category + sep
             if not path.exists(current_dir):
                 mkdir(current_dir)
@@ -227,13 +233,58 @@ class MainWindow(base, form):
         except WindowsError:
             QMessageBox.about(self, "Error", "Too little time for previous backup!\nWait a minute, please.")
 
+    def restore(self):
+        self.progressBarBackup.setMinimum(0)
+        self.progressBarBackup.setMaximum(0)
+        self.threads = []
+        self.files_to_restore = {}
+        for index, state in self.model_storage.checks.items():
+            th = Thread(target=self.model_storage.exportChecked, args=(self.lock, {index: state}, self.files_to_restore))
+            th.start()
+            self.threads.append(th)
+
+        status = map(Thread.isAlive, self.threads)
+
+        while any(status):
+            qApp.processEvents()
+            status = map(Thread.isAlive, self.threads)
+
+        self.progressBarBackup.setMaximum(100)
+        if self.files_to_restore:
+            dialog = Restore_type(self)
+            dialog.setModal(True)
+            self.prev_or_spec, self.path_to_restore, ok = dialog.call(self)
+            if ok:
+                if self.prev_or_spec:
+                    '''
+                    for cat, backups in self.files_to_restore.items():
+                        sorted_by_date = sorted(backups.keys(), key=lambda x: x, reverse=True)
+                        for backup in sorted_by_date:
+                            for f in backups[backup]:
+                                if f.split('.')[-1] == 'link':
+                                    f = open(f, 'r').read()
+                       '''
+                    pass
+                else:
+                    pass
+            else:
+                pass
+        else:
+            QMessageBox.about(self, "Error", "Select the storage/backup/file before restoring!")
+
+
+
     def add_storage(self):
         dialog = NewStorage(self)
+        dialog.setModal(True)
         dialog.show()
 
     def select_file_types(self):
         dialog = FileTypes(self)
+        dialog.setModal(True)
         dialog.show()
+
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

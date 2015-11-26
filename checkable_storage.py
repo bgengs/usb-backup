@@ -1,5 +1,6 @@
-from PyQt4.QtCore import Qt
+from PyQt4.QtCore import Qt, QFileInfo
 from PyQt4.QtGui import QFileSystemModel
+from os import path, sep, walk
 
 def are_parent_and_child(parent, child):
     while child.isValid():
@@ -41,3 +42,29 @@ class Model(QFileSystemModel):
 
         return Qt.ItemIsUserCheckable | QFileSystemModel.flags(self, QModelIndex)
 
+    def exportChecked(self, lock, dirs={}, found={}):
+        if not dirs:
+            dirs = self.checks
+        for index in dirs.keys():
+            if dirs[index] == Qt.Checked:
+                if path.isfile(unicode(self.filePath(index))):
+                    date = unicode(self.filePath(index)).split(sep)[-3]
+                    category = unicode(self.filePath(index)).split(sep)[-2]
+                    if category not in found.keys():
+                        found.update({category: {}})
+                    elif date not in found[category].keys():
+                        found[category].update({date: []})
+                    found[category][date].append(path.normpath(unicode(self.filePath(index))).split(sep)[-1])
+                else:
+                    for cur_path, dirs, files in walk(unicode(self.filePath(index))):
+                        for filename in files:
+                            if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='hash':
+                                date = unicode(cur_path).split(sep)[-2]
+                                category = unicode(cur_path).split(sep)[-1]
+
+                                if category not in found.keys():
+                                    found.update({category: {}})
+                                if date not in found[category].keys():
+                                    found[category].update({date: []})
+                                found[category][date].append(filename)
+        print('ended')

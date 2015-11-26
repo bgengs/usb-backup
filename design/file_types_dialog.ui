@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>200</width>
+    <width>257</width>
     <height>400</height>
    </rect>
   </property>
@@ -49,6 +49,10 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>treeView</tabstop>
+  <tabstop>saveButton</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

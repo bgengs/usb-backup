@@ -67,6 +67,13 @@
    </item>
   </layout>
  </widget>
+ <tabstops>
+  <tabstop>storageNameLine</tabstop>
+  <tabstop>passLine</tabstop>
+  <tabstop>confirmLine</tabstop>
+  <tabstop>okButton</tabstop>
+  <tabstop>cancelButton</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

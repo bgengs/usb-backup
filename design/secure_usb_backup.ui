@@ -39,7 +39,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>1</number>
       </property>
       <property name="movable">
        <bool>false</bool>
@@ -190,6 +190,19 @@
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <tabstops>
+  <tabstop>treeViewComputer</tabstop>
+  <tabstop>fileTypesButton</tabstop>
+  <tabstop>scanButton</tabstop>
+  <tabstop>backupButtonStorage</tabstop>
+  <tabstop>treeViewStorage</tabstop>
+  <tabstop>newStorageButton</tabstop>
+  <tabstop>restoreButton</tabstop>
+  <tabstop>backupButtonComp</tabstop>
+  <tabstop>helpButtonComputer</tabstop>
+  <tabstop>helpButtonStorage</tabstop>
+  <tabstop>tabWidgetRoot</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>
