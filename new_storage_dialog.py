@@ -1,8 +1,9 @@
 from PyQt4 import uic
 from PyQt4.QtGui import QLineEdit, QLabel, QPalette, QItemSelectionModel
 from PyQt4.QtCore import Qt, QObject, SIGNAL, QRect
-from os import sep, path, mkdir
+from os import sep, path, mkdir, walk
 from Crypto.Hash import SHA256
+from string import printable
 
 base, form = uic.loadUiType("design"+sep+"new_storage_dialog.ui")
 class NewStorage(base, form):
@@ -26,13 +27,20 @@ class NewStorage(base, form):
         elif self.passLine.text() != self.confirmLine.text():
             self.errorLabel.setText("Password mismatch!")
         else:
-            current_dir = parent.current_dir + str(self.storageNameLine.text())
-            mkdir(current_dir)
-            password = self.passLine.text()+parent.padding[len(self.passLine.text()):]
-            open(current_dir + sep + "hash", 'w').write(SHA256.new(password).hexdigest())
-            parent.password = self.passLine.text()
-            parent.selected_storage = str(self.storageNameLine.text())
-            index = parent.model_storage.index(current_dir)
-            #parent.treeViewStorage.setSelection(index, QItemSelectionModel.NoUpdate)
-            parent.treeViewStorage.setCurrentIndex(index)
-            self.close()
+            try:
+                password = str(self.passLine.text())
+                storage = str(self.storageNameLine.text())
+                if storage in next(walk(parent.current_dir))[1]:
+                    self.errorLabel.setText("Name already exist!")
+                else:
+                    current_dir = parent.current_dir + storage
+                    mkdir(current_dir)
+                    open(current_dir+sep+"hash",'w').write(SHA256.new(password + parent.padding[len(password):]).hexdigest())
+                    parent.password = password
+                    parent.selected_storage = storage
+                    index = parent.model_storage.index(current_dir)
+                    #parent.treeViewStorage.setSelection(index, QItemSelectionModel.NoUpdate)
+                    parent.treeViewStorage.setCurrentIndex(index)
+                    self.close()
+            except UnicodeError:
+                self.errorLabel.setText("Password or Name has unacceptable symbols!")

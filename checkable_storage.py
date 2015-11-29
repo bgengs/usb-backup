@@ -48,23 +48,31 @@ class Model(QFileSystemModel):
         for index in dirs.keys():
             if dirs[index] == Qt.Checked:
                 if path.isfile(unicode(self.filePath(index))):
-                    date = unicode(self.filePath(index)).split(sep)[-3]
-                    category = unicode(self.filePath(index)).split(sep)[-2]
-                    if category not in found.keys():
-                        found.update({category: {}})
-                    elif date not in found[category].keys():
-                        found[category].update({date: []})
-                    found[category][date].append(path.normpath(unicode(self.filePath(index))).split(sep)[-1])
+                    file_dir_path = unicode(self.filePath(index)).split(sep)
+                    print(file_dir_path)
+                    storage = file_dir_path[-4].split('/')[-1]
+                    date = file_dir_path[-3]
+                    category = file_dir_path[-2]
+                    if storage not in found.keys():
+                        found.update({storage: {}})
+                    if category not in found[storage].keys():
+                        found[storage].update({category: {}})
+                    if date not in found[storage][category].keys():
+                        found[storage][category].update({date: []})
+                    found[storage][category][date].append(path.normpath(file_dir_path[-1]))
                 else:
                     for cur_path, dirs, files in walk(unicode(self.filePath(index))):
                         for filename in files:
                             if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='hash':
-                                date = unicode(cur_path).split(sep)[-2]
-                                category = unicode(cur_path).split(sep)[-1]
-
-                                if category not in found.keys():
-                                    found.update({category: {}})
-                                if date not in found[category].keys():
-                                    found[category].update({date: []})
-                                found[category][date].append(filename)
+                                file_dir_path = cur_path.split(sep)
+                                storage = file_dir_path[-3].split('/')[-1]
+                                date = file_dir_path[-2]
+                                category = file_dir_path[-1]
+                                if storage not in found.keys():
+                                    found.update({storage: {}})
+                                if category not in found[storage].keys():
+                                    found[storage].update({category: {}})
+                                if date not in found[storage][category].keys():
+                                    found[storage][category].update({date: []})
+                                found[storage][category][date].append(filename)
         print('ended')
