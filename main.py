@@ -113,57 +113,49 @@ class MainWindow(base, form):
 
     def is_exist(self, storage, file_path, category):  # in storage
         file_name = file_path.split(sep)[-1]
-        return_value = (False, '')
-        checked = False
         for curdir, dirs, files in walk(self.current_dir + storage + sep):
-            #print(curdir.split(sep)[-1], category)
             if curdir.split(sep)[-1] == category:
-
                 for file in files:
                     if file == file_name:
-                        decrypted = self.decrypt_and_cmp(curdir + sep + file, file_path)
-                        if decrypted:
-                            with open(decrypted, 'r') as dec, open(file_path, 'r') as new:
-                                existed = SHA256.new(dec.read())
-                                found = SHA256.new(new.read())
-                                if existed.hexdigest() == found.hexdigest():
-                                    return_value = (True, curdir)
-                            checked = True
-        if checked:
-            try:
-                remove(decrypted)
-            except TypeError:
-                #print(curdir+sep+file, file_path, file, file_name, file==file_name)
-                #print(decrypted)
-                #print(checked)
-                #print(return_value)
-                return False
-        return return_value
+                        sha_existed = SHA256.new()
+                        sha_found = SHA256.new()
+                        with open(curdir+sep+file, 'rb') as ciphered, open(file_path, 'rb') as found:
+                            origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
+                            current_len = 0
+                            iv = ciphered.read(16)
+                            saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
+                            if saved_file_path != file_path:
+                                continue
+                            decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
+                            chunksize = 64*1024*16
 
-    def decrypt_and_cmp(self, path_to_stor, path_to_comp):
-        try:
-            with open(path_to_stor, 'rb') as ciphered:
-                origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
-                iv = ciphered.read(16)
-                saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
-                if saved_file_path != path_to_comp:
-                    raise ValueError
-                decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
-                chunksize = 24*1024
-                with open(path_to_stor+'.dec', 'wb') as outfile:
-                    chunk = ciphered.read(chunksize)
-                    while chunk:
-                        outfile.write(decryptor.decrypt(chunk))
-                        chunk = ciphered.read(chunksize)
-                    outfile.truncate(origsize)
-            return path_to_stor+'.dec'
-        except ValueError:  # it's other file with same name
-            return None
-
+                            pure_chunk = found.read(chunksize)
+                            crypt_chunk = ciphered.read(chunksize)
+                            #print('existed', curdir+sep+file)
+                            #print('foubd', file_path)
+                            #print('pure', len(pure_chunk))
+                            #print('crypt', len(crypt_chunk))
+                            #print('orgsize', origsize)
+                            while crypt_chunk:
+                                plain = decryptor.decrypt(crypt_chunk)
+                                current_len += len(plain)
+                                if current_len > origsize:
+                                    trunk = current_len-origsize
+                                    plain = plain[:-trunk]
+                                    print('trunk', len(plain))
+                                sha_existed.update(plain)
+                                sha_found.update(pure_chunk)
+                                if sha_existed.hexdigest() != sha_found.hexdigest():
+                                    break
+                                crypt_chunk = ciphered.read(chunksize)
+                                pure_chunk = found.read(chunksize)
+                        return True, curdir+sep+file
+        return False, ''
 
     def encrypt_and_save_to(self, warehouse):
         files_count = sum(len(f) for f in self.files_found.values())
         self.progressBarBackup.setMaximum(files_count)
+        self.progressBarBackup.setValue(0)
         now_date = datetime.datetime.now().strftime('Backup_%m-%d-%y_%H-%M')
         mkdir(self.current_dir + warehouse + sep + now_date + sep)
         for category, files in self.files_found.items():
@@ -173,12 +165,10 @@ class MainWindow(base, form):
             for file_path in files:
                 file_name = file_path.split(sep)[-1]
                 exist = self.is_exist(warehouse, file_path, category)
-                print(self.password+self.padding[len(self.password):])
                 if not exist[0]:
-                    with open(file_path, 'rb') as reader, open(current_dir+file_name, 'ab') as writer:
+                    with open(file_path, 'rb') as reader, open(current_dir+file_name, 'wb') as writer:
                         chunksize=64*1024*16
                         iv = ''.join(chr(random.randint(0, 0xFF)) for _ in range(16))
-                        print(self.password+self.padding[len(self.password):])
                         cipher = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
                         filesize = path.getsize(file_path)
 
@@ -196,7 +186,7 @@ class MainWindow(base, form):
                             part = reader.read(chunksize)
                 else:
                     with open(current_dir+file_name+'.link', 'w') as writer:
-                        writer.write(exist[1]+sep+file_name)
+                        writer.write(exist[1])
                 qApp.processEvents()
                 self.progressBarBackup.setValue(self.progressBarBackup.value()+1)
         self.progressBarBackup.setValue(self.progressBarBackup.maximum())
@@ -300,7 +290,6 @@ class MainWindow(base, form):
                 if new_path:
                     path_to_save = new_path+sep+path_to_file.split(sep)[-1]
                 if not path.exists(path_to_save):
-                    print(key+self.padding[len(key):])
                     decryptor = AES.new(key+self.padding[len(key):], AES.MODE_CBC, iv)
                     chunksize = 24*1024
                     with open(path_to_save, 'wb') as outfile:
