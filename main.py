@@ -1,5 +1,5 @@
 import sys, datetime, random
-from os import path, sep, mkdir, walk, remove
+from os import path, sep, mkdir, walk, remove, rename, stat
 from shutil import copy2
 from PyQt4 import uic
 from PyQt4.QtGui import QApplication, qApp, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView, QProgressBar
@@ -12,6 +12,7 @@ from threading import Thread, Lock
 from time import sleep
 from checkable_storage import Model as StorageModel
 from Crypto.Hash import SHA256
+from crcmod import Crc
 from Crypto.Cipher import AES
 from struct import pack, unpack, calcsize
 
@@ -111,7 +112,7 @@ class MainWindow(base, form):
         self.backupButtonComp.setEnabled(True)
         #self.fileTypesButton.setEnabled(True)
 
-    def is_exist(self, storage, file_path, category):  # in storage
+    def is_exist_old(self, storage, file_path, category):  # in storage
         file_name = file_path.split(sep)[-1]
         for curdir, dirs, files in walk(self.current_dir + storage + sep):
             if curdir.split(sep)[-1] == category:
@@ -152,6 +153,26 @@ class MainWindow(base, form):
                         return True, curdir+sep+file
         return False, ''
 
+    def is_exist(self, storage, file_path, category):
+        file_name = file_path.split(sep)[-1]
+        for curdir, dirs, files in walk(self.current_dir + storage + sep):
+            if curdir.split(sep)[-1] == category:
+                for file in files:
+                    if file[:-8] == file_name:
+                        checksumm = Crc(0x104c11db7)
+                        checksumm.update(file_path)
+                        checksumm.update(str(stat(file_path)[-2]))
+                        with open(file_path, 'rb') as reader:
+                            chunk = reader.read(1024*1024*8)
+                            while chunk:
+                                checksumm.update(chunk)
+                                chunk = reader.read(1024*1024*8)
+
+                        if checksumm.hexdigest() == file[-8:]:
+                            return True
+        return False
+
+
     def encrypt_and_save_to(self, warehouse):
         files_count = sum(len(f) for f in self.files_found.values())
         self.progressBarBackup.setMaximum(files_count)
@@ -164,8 +185,10 @@ class MainWindow(base, form):
                 mkdir(current_dir)
             for file_path in files:
                 file_name = file_path.split(sep)[-1]
-                exist = self.is_exist(warehouse, file_path, category)
-                if not exist[0]:
+                if not self.is_exist(warehouse, file_path, category):
+                    checksumm = Crc(0x104c11db7)
+                    checksumm.update(file_path)
+                    checksumm.update(str(stat(file_path)[-2]))  # modification time
                     with open(file_path, 'rb') as reader, open(current_dir+file_name, 'wb') as writer:
                         chunksize=64*1024*16
                         iv = ''.join(chr(random.randint(0, 0xFF)) for _ in range(16))
@@ -178,15 +201,16 @@ class MainWindow(base, form):
                         writer.write(file_path)
 
                         part = reader.read(chunksize)
+                        checksumm.update(part)
                         while part:
                             if len(part) % 16 != 0:
                                 part += ' ' * (16 - len(part) % 16)
                             ciphertext = cipher.encrypt(part)
                             writer.write(ciphertext)
                             part = reader.read(chunksize)
-                else:
-                    with open(current_dir+file_name+'.link', 'w') as writer:
-                        writer.write(exist[1])
+                            checksumm.update(part)
+                    rename(current_dir+file_name, current_dir+file_name+checksumm.hexdigest())
+
                 qApp.processEvents()
                 self.progressBarBackup.setValue(self.progressBarBackup.value()+1)
         self.progressBarBackup.setValue(self.progressBarBackup.maximum())
@@ -199,35 +223,35 @@ class MainWindow(base, form):
             for i, dir in enumerate(selected_path):
                 if dir == "Backups":
                     storage = str(selected_path[i-1])
-
-            hash_from_storage = open(self.current_dir + storage + sep + "hash", 'r').read()
-            hash_from_user = SHA256.new(self.password+self.padding[len(self.password):]).hexdigest()
-            if self.selected_storage == storage and hash_from_user == hash_from_storage:
-                print("when selected and already backuped", self.password)
-                self.encrypt_and_save_to(storage)
-            else:
-                key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage,
-                                               mode=QLineEdit.Password)
-                if ok:
-                    try:
-                        key = str(key)
-                    except UnicodeError:
-                        QMessageBox.about(self, "Error", "Incorrect password!")
-                    hash_from_user = SHA256.new(key+self.padding[len(key):]).hexdigest()
-                    self.password = key
-                    if hash_from_user == hash_from_storage:
-                        print("when selected", self.password)
-                        self.encrypt_and_save_to(storage)
-                    else:
-                        QMessageBox.about(self, "Error", "Incorrect password!")
+            key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage, mode=QLineEdit.Password)
+            if ok:
+                try:
+                    key = str(key)
+                    with open(self.current_dir + storage + sep + "init", 'rb') as f:
+                        hash_from_storage = f.read(64)
+                        cipter_text = f.read()
+                        print(len(hash_from_storage))
+                        print(len(cipter_text))
+                        encryptor = AES.new(key+self.padding[len(key):])
+                        plain = encryptor.decrypt(cipter_text)
+                        if hash_from_storage == SHA256.new(plain).hexdigest():
+                            self.encrypt_and_save_to(storage)
+                        else:
+                            QMessageBox.about(self, "Error", "Incorrect password!")
+                except UnicodeError:
+                    QMessageBox.about(self, "Error", "Incorrect password!")
 
         except IndexError:
             if self.selected_storage:
-                hash_from_storage = open(self.current_dir + self.selected_storage + sep + "hash", 'r').read()
-                hash_from_user = SHA256.new(self.password+self.padding[len(self.password):]).hexdigest()
-                if hash_from_user == hash_from_storage:
-                    print("when new created", self.password)
-                    self.encrypt_and_save_to(self.selected_storage)
+                with open(self.current_dir + self.selected_storage + sep + "init", 'rb') as f:
+                        hash_from_storage = f.read(64)
+                        cipter_text = f.read()
+                        encryptor = AES.new(self.password+self.padding[len(self.password):])
+                        plain = encryptor.decrypt(cipter_text)
+                        if hash_from_storage == SHA256.new(plain).hexdigest():
+                            self.encrypt_and_save_to(self.selected_storage)
+                        else:
+                            QMessageBox.about(self, "Error", "Incorrect password!")
             else:
                 QMessageBox.about(self, "Error", "Select the storage before creating backup!")
                 self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
@@ -259,25 +283,29 @@ class MainWindow(base, form):
 
             if ok:
                 for storage, categories in self.files_to_restore.items():
-                    hash_from_storage = open(self.current_dir + storage + sep + "hash", 'r').read()
                     key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage,
                                                    mode=QLineEdit.Password)
                     if ok:
                         try:
                             key = str(key)
+                            with open(self.current_dir + storage + sep + "init", 'rb') as f:
+                                hash_from_storage = f.read(64)
+                                cipter_text = f.read()
+                                encryptor = AES.new(key+self.padding[len(key):])
+                                plain = encryptor.decrypt(cipter_text)
+                                if hash_from_storage == SHA256.new(plain).hexdigest():
+                                    for cat, backups in categories.items():
+                                        sorted_by_date = sorted(backups.keys(), key=lambda x: x)
+                                        for backup in sorted_by_date:
+                                            for fn in backups[backup]:
+                                                path_to_file = self.current_dir+storage+sep+backup+sep+cat+sep+fn
+                                                if fn.split('.')[-1] == 'link':
+                                                    path_to_file = open(self.current_dir+storage+sep+backup+sep+cat+sep+fn, 'r').read()
+                                                self.decrypt_and_save(path_to_file, key,
+                                                                      new_path=self.path_to_restore+sep+cat if not self.prev_or_spec else '')
+                                else:
+                                    QMessageBox.about(self, "Error", "Incorrect password!")
                         except UnicodeError:
-                            QMessageBox.about(self, "Error", "Incorrect password!")
-                        hash_from_user = SHA256.new(key+self.padding[len(key):]).hexdigest()
-                        if hash_from_user == hash_from_storage:
-                            for cat, backups in categories.items():
-                                sorted_by_date = sorted(backups.keys(), key=lambda x: x, reverse=True)
-                                for backup in sorted_by_date:
-                                    for fn in backups[backup]:
-                                        path_to_file = self.current_dir+storage+sep+backup+sep+cat+sep+fn
-                                        if fn.split('.')[-1] == 'link':
-                                            path_to_file = open(self.current_dir+storage+sep+backup+sep+cat+sep+fn, 'r').read()
-                                        self.decrypt_and_save(path_to_file, key, new_path=self.path_to_restore if not self.prev_or_spec else '')
-                        else:
                             QMessageBox.about(self, "Error", "Incorrect password!")
         else:
             QMessageBox.about(self, "Error", "Select the storage/backup/file before restoring!")
@@ -288,16 +316,25 @@ class MainWindow(base, form):
                 iv = ciphered.read(16)
                 path_to_save = ciphered.read(unpack('<B', ciphered.read(1))[0])
                 if new_path:
-                    path_to_save = new_path+sep+path_to_file.split(sep)[-1]
-                if not path.exists(path_to_save):
-                    decryptor = AES.new(key+self.padding[len(key):], AES.MODE_CBC, iv)
-                    chunksize = 24*1024
-                    with open(path_to_save, 'wb') as outfile:
+                    if not path.exists(new_path):
+                        mkdir(new_path)
+                    file_name = path_to_file.split(sep)[-1][:-8]
+                    path_to_save = new_path+sep+file_name
+                    if path.exists(path_to_save):
+                        path_to_save = new_path+sep+path_to_file.split(sep)[-1]
+
+                decryptor = AES.new(key+self.padding[len(key):], AES.MODE_CBC, iv)
+                chunksize = 24*1024
+                with open(path_to_save, 'wb') as outfile:
+                    chunk = ciphered.read(chunksize)
+                    while chunk:
+                        outfile.write(decryptor.decrypt(chunk))
                         chunk = ciphered.read(chunksize)
-                        while chunk:
-                            outfile.write(decryptor.decrypt(chunk))
-                            chunk = ciphered.read(chunksize)
-                        outfile.truncate(origsize)
+                    outfile.truncate(origsize)
+
+
+
+
 
     def add_storage(self):
         dialog = NewStorage(self)

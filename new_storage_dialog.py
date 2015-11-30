@@ -3,7 +3,9 @@ from PyQt4.QtGui import QLineEdit, QLabel, QPalette, QItemSelectionModel
 from PyQt4.QtCore import Qt, QObject, SIGNAL, QRect
 from os import sep, path, mkdir, walk
 from Crypto.Hash import SHA256
-from string import printable
+from random import getrandbits
+from Crypto.Cipher import AES
+
 
 base, form = uic.loadUiType("design"+sep+"new_storage_dialog.ui")
 class NewStorage(base, form):
@@ -22,6 +24,8 @@ class NewStorage(base, form):
         self.errorLabel.setPalette(palette)
         if any([not self.storageNameLine.text(), not self.passLine.text(), not self.confirmLine.text()]):
             self.errorLabel.setText("All fields are required!")
+        #elif len(self.passLine.text()) < 8 or len(self.passLine.text()) > 16:
+        #    self.errorLabel.setText("Password must contain 8-16 characters!")
         elif any(ch in self.storageNameLine.text() for ch in r'*|\:"<>?/'):  #TODO: to check name for linux and mac
             self.errorLabel.setText("Name has unacceptable symbols!")
         elif self.passLine.text() != self.confirmLine.text():
@@ -35,11 +39,21 @@ class NewStorage(base, form):
                 else:
                     current_dir = parent.current_dir + storage
                     mkdir(current_dir)
-                    open(current_dir+sep+"hash",'w').write(SHA256.new(password + parent.padding[len(password):]).hexdigest())
+                    hash = SHA256.new()
+                    cipher = AES.new(password+parent.padding[len(password):])
+                    cipher_text = ''
+                    for i in range(10*1024):
+                        new_part = ''
+                        for _ in range(16):
+                            new_part += chr(getrandbits(8))
+                        hash.update(new_part)
+                        cipher_text += cipher.encrypt(new_part)
+
+                    open(current_dir+sep+"init", 'wb').write(hash.hexdigest()+cipher_text)
+
                     parent.password = password
                     parent.selected_storage = storage
                     index = parent.model_storage.index(current_dir)
-                    #parent.treeViewStorage.setSelection(index, QItemSelectionModel.NoUpdate)
                     parent.treeViewStorage.setCurrentIndex(index)
                     self.close()
             except UnicodeError:

@@ -63,7 +63,7 @@ class Model(QFileSystemModel):
                 else:
                     for cur_path, dirs, files in walk(unicode(self.filePath(index))):
                         for filename in files:
-                            if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='hash':
+                            if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='init':
                                 file_dir_path = cur_path.split(sep)
                                 storage = file_dir_path[-3].split('/')[-1]
                                 date = file_dir_path[-2]
