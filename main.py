@@ -1,13 +1,14 @@
-import sys, datetime, random
+import sys, datetime, random, time
 from os import path, sep, mkdir, walk, remove, rename, stat
 from shutil import copy2
 from PyQt4 import uic
-from PyQt4.QtGui import QApplication, qApp, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView, QProgressBar
+from PyQt4.QtGui import QApplication, qApp, QFileSystemModel, QMessageBox, QInputDialog, QLineEdit, QDialog, QTreeView, QProgressBar, QStandardItemModel, QStandardItem, QPushButton
 from PyQt4.QtCore import Qt
 from checkable_dir import CheckableDirModel
 from file_types_window import FileTypes
 from new_storage_dialog import NewStorage
 from restore_dialog import Restore_type
+from files_found_dialog import FilesFound
 from threading import Thread, Lock
 from time import sleep
 from checkable_storage import Model as StorageModel
@@ -40,10 +41,18 @@ class MainWindow(base, form):
         self.files_to_restore = {}
         self.selected_file_types = {}
         self.lock = Lock()
+        self.stop = False
         self.threads = []
         self.prev_or_spec = True  # True for restore to previous place, False for specifed
         self.path_to_restore = u''
         self.restore_ok = False
+        self.files_found_model = QStandardItemModel
+        self.files_found_tree = QTreeView
+        self.files_found_ok = False
+        self.files_found_cancel = False
+        self.files_found_bar = QProgressBar
+        self.files_found_ok_enable = QPushButton
+        self.category_number_length = {}
 
         self.model_storage = StorageModel()
         if not path.exists(path.dirname(path.abspath(__file__)) + sep + "Backups"):
@@ -71,7 +80,7 @@ class MainWindow(base, form):
         self.restoreButton.clicked.connect(self.restore)
 
     def help(self):
-        print(self.password)
+        print(self.files_found)
 
     def scan(self):
         #self.treeViewComputer.setEnabled(False)
@@ -79,20 +88,32 @@ class MainWindow(base, form):
         #self.fileTypesButton.setEnabled(False)
         self.files_found = {}
         self.threads = []
+        self.stop = False
         if not self.selected_file_types:
-            dialog = FileTypes(self)
-            dialog.show()
-            return
+            dialog = FileTypes()
+            dialog.setModal(True)
+            self.selected_file_types, ok = dialog.call()
+            if not ok:
+                return
+        files_found_dialog = FilesFound(self)
+        files_found_dialog.setModal(True)
+        files_found_dialog.show()
+        header_counter = 0
         for element in self.selected_file_types:
             selected = []
             for _type, state in element["Types"].items():
                 if state == Qt.Checked:
                     selected.append(_type)
             if selected:
+                cat = QStandardItem(element.keys()[0])
+                self.files_found_model.setHorizontalHeaderItem(header_counter, cat)
+                self.category_number_length.update({element.keys()[0]: [header_counter, 0]})
+                self.files_found_tree.setColumnWidth(header_counter-1, 200)
+                header_counter += 1
                 for index, state in self.model_computer.checks.items():
                     self.files_found.update({element.keys()[0]: []})
                     print("start tread for %s" % element.keys()[0])
-                    th = Thread(target=self.model_computer.exportChecked, args=(self.lock,
+                    th = Thread(target=self.model_computer.exportChecked, args=(self,
                                                                        {index: state},
                                                                        element.keys()[0],
                                                                        selected, self.files_found))
@@ -100,76 +121,65 @@ class MainWindow(base, form):
                     self.threads.append(th)
 
         status = map(Thread.isAlive, self.threads)
-
+        start_time = time.time()
         while any(status):
             qApp.processEvents()
             status = map(Thread.isAlive, self.threads)
-            self.filesFoundLabel.setText("Scaning...")
+            self.filesFoundLabel.setText("Scanning...")
 
-        self.filesFoundLabel.setText("Scaning finished! Files found %s" % sum(len(v) for k, v in self.files_found.items()))
+            if (time.time() - start_time) % 2 == 0:
+                self.lock.acquire()
+                for cat, (num, length) in self.category_number_length.items():
+                    files = self.files_found[cat]
+                    for i in range(length, len(files)):
+                        fileItem = QStandardItem(self.files_found[cat][i].split(sep)[-1])
+                        fileItem.setCheckable(True)
+                        fileItem.setCheckState(2)
+                        fileItem.setToolTip(self.files_found[cat][i])
+                        self.files_found_model.invisibleRootItem().setChild(i, num, fileItem)
+                    self.category_number_length[cat][1] = len(files)
+                self.lock.release()
 
+        if self.stop:
+            self.filesFoundLabel.setText("Scanning was stopped by user")
+            self.files_found = {}
+            self.threads = []
+        else:
+            for cat, (num, length) in self.category_number_length.items():
+                    files = self.files_found[cat]
+                    for i in range(length, len(files)):
+                        fileItem = QStandardItem(self.files_found[cat][i].split(sep)[-1])
+                        fileItem.setCheckable(True)
+                        fileItem.setCheckState(2)
+                        fileItem.setToolTip(self.files_found[cat][i])
+                        self.files_found_model.invisibleRootItem().setChild(i, num, fileItem)
+                    self.category_number_length[cat][1] = len(files)
+            self.filesFoundLabel.setText("Scanning finished! Files found %s" % sum(len(v) for k, v in self.files_found.items()))
+            self.files_found_bar.setMaximum(1)
+            self.files_found_bar.setValue(1)
+            self.files_found_ok_enable.setEnabled(True)
         #self.treeViewComputer.setEnabled(True)
         self.backupButtonComp.setEnabled(True)
         #self.fileTypesButton.setEnabled(True)
 
-    def is_exist_old(self, storage, file_path, category):  # in storage
+
+    def is_exist(self, storage, file_path, category, now_date):
         file_name = file_path.split(sep)[-1]
         for curdir, dirs, files in walk(self.current_dir + storage + sep):
-            if curdir.split(sep)[-1] == category:
-                for file in files:
-                    if file == file_name:
-                        sha_existed = SHA256.new()
-                        sha_found = SHA256.new()
-                        with open(curdir+sep+file, 'rb') as ciphered, open(file_path, 'rb') as found:
-                            origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
-                            current_len = 0
-                            iv = ciphered.read(16)
-                            saved_file_path = ciphered.read(unpack('<B', ciphered.read(1))[0])
-                            if saved_file_path != file_path:
-                                continue
-                            decryptor = AES.new(self.password+self.padding[len(self.password):], AES.MODE_CBC, iv)
-                            chunksize = 64*1024*16
-
-                            pure_chunk = found.read(chunksize)
-                            crypt_chunk = ciphered.read(chunksize)
-                            #print('existed', curdir+sep+file)
-                            #print('foubd', file_path)
-                            #print('pure', len(pure_chunk))
-                            #print('crypt', len(crypt_chunk))
-                            #print('orgsize', origsize)
-                            while crypt_chunk:
-                                plain = decryptor.decrypt(crypt_chunk)
-                                current_len += len(plain)
-                                if current_len > origsize:
-                                    trunk = current_len-origsize
-                                    plain = plain[:-trunk]
-                                    print('trunk', len(plain))
-                                sha_existed.update(plain)
-                                sha_found.update(pure_chunk)
-                                if sha_existed.hexdigest() != sha_found.hexdigest():
-                                    break
-                                crypt_chunk = ciphered.read(chunksize)
-                                pure_chunk = found.read(chunksize)
-                        return True, curdir+sep+file
-        return False, ''
-
-    def is_exist(self, storage, file_path, category):
-        file_name = file_path.split(sep)[-1]
-        for curdir, dirs, files in walk(self.current_dir + storage + sep):
-            if curdir.split(sep)[-1] == category:
-                for file in files:
-                    if file[:-8] == file_name:
-                        checksumm = Crc(0x104c11db7)
-                        checksumm.update(file_path)
-                        checksumm.update(str(stat(file_path)[-2]))
-                        with open(file_path, 'rb') as reader:
-                            chunk = reader.read(1024*1024*8)
-                            while chunk:
-                                checksumm.update(chunk)
+                if curdir.split(sep)[-1] == category and curdir.split(sep)[-2] != now_date:
+                    for file in files:
+                        if file[:-8] == file_name:
+                            checksumm = Crc(0x104c11db7)
+                            checksumm.update(file_path)
+                            checksumm.update(str(stat(file_path)[-2]))
+                            with open(file_path, 'rb') as reader:
                                 chunk = reader.read(1024*1024*8)
+                                while chunk:
+                                    checksumm.update(chunk)
+                                    chunk = reader.read(1024*1024*8)
 
-                        if checksumm.hexdigest() == file[-8:]:
-                            return True
+                            if checksumm.hexdigest() == file[-8:]:
+                                return True
         return False
 
 
@@ -185,7 +195,7 @@ class MainWindow(base, form):
                 mkdir(current_dir)
             for file_path in files:
                 file_name = file_path.split(sep)[-1]
-                if not self.is_exist(warehouse, file_path, category):
+                if not self.is_exist(warehouse, file_path, category, now_date):
                     checksumm = Crc(0x104c11db7)
                     checksumm.update(file_path)
                     checksumm.update(str(stat(file_path)[-2]))  # modification time
@@ -223,7 +233,9 @@ class MainWindow(base, form):
             for i, dir in enumerate(selected_path):
                 if dir == "Backups":
                     storage = str(selected_path[i-1])
-            key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage, mode=QLineEdit.Password)
+            dialog = QInputDialog()
+            dialog.setModal(True)
+            key, ok = dialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage, mode=QLineEdit.Password)
             if ok:
                 try:
                     key = str(key)
@@ -261,6 +273,7 @@ class MainWindow(base, form):
     def restore(self):
         self.progressBarBackup.setMinimum(0)
         self.progressBarBackup.setMaximum(0)
+        self.restoreButton.setEnabled(False)
         self.threads = []
         self.files_to_restore = {}
         #print(self.treeViewStorage)
@@ -283,7 +296,9 @@ class MainWindow(base, form):
 
             if ok:
                 for storage, categories in self.files_to_restore.items():
-                    key, ok = QInputDialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage,
+                    dialog = QInputDialog()
+                    dialog.setModal(True)
+                    key, ok = dialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage,
                                                    mode=QLineEdit.Password)
                     if ok:
                         try:
@@ -309,6 +324,7 @@ class MainWindow(base, form):
                             QMessageBox.about(self, "Error", "Incorrect password!")
         else:
             QMessageBox.about(self, "Error", "Select the storage/backup/file before restoring!")
+        self.restoreButton.setEnabled(True)
 
     def decrypt_and_save(self, path_to_file, key, new_path):
         with open(path_to_file, 'rb') as ciphered:
@@ -332,20 +348,17 @@ class MainWindow(base, form):
                         chunk = ciphered.read(chunksize)
                     outfile.truncate(origsize)
 
-
-
-
-
     def add_storage(self):
         dialog = NewStorage(self)
         dialog.setModal(True)
         dialog.show()
 
     def select_file_types(self):
-        dialog = FileTypes(self)
+        dialog = FileTypes()
         dialog.setModal(True)
-        dialog.show()
-
+        types, ok = dialog.call()
+        if ok:
+            self.selected_file_types = types
 
 
 if __name__ == '__main__':

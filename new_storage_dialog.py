@@ -43,9 +43,7 @@ class NewStorage(base, form):
                     cipher = AES.new(password+parent.padding[len(password):])
                     cipher_text = ''
                     for i in range(10*1024):
-                        new_part = ''
-                        for _ in range(16):
-                            new_part += chr(getrandbits(8))
+                        new_part = reduce(lambda x, y: x+y, [chr(getrandbits(8)) for _ in range(16)])
                         hash.update(new_part)
                         cipher_text += cipher.encrypt(new_part)
 

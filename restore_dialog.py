@@ -40,7 +40,7 @@ class Restore_type(base, form):
         self.labelPath.setText(self.selected_path)
 
     @staticmethod
-    def call(self, parent=None):
+    def call(parent=None):
         dialog = Restore_type(parent)
         result = dialog.exec_()
         prev_or_spec, path = dialog.current_state()

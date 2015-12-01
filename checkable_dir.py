@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QDirModel, QLabel
+from PyQt4.QtGui import QDirModel, QLabel, QStandardItem
 from PyQt4.QtCore import Qt, QFileInfo, QModelIndex
 import os
 
@@ -73,18 +73,48 @@ class CheckableDirModel(QDirModel):
                 self.checkedCount(child)
         return self.checked
 
-    def exportChecked(self, lock, dirs={}, category='', acceptedSuffix=['jpg', 'png', 'bmp'], found={}):
+    def exportChecked(self, parent, dirs={}, category='', acceptedSuffix=['jpg', 'png', 'bmp'], found={}):
+        counter = 0
         if not dirs:
             dirs = self.checks
         for index in dirs.keys():
             if dirs[index] == Qt.Checked:
                 if os.path.isfile(unicode(self.filePath(index))) and QFileInfo(self.filePath(index)).completeSuffix().toLower() in acceptedSuffix:
-                    found[category].append(os.path.normpath(unicode(self.filePath(index))))
+                    if parent.stop:
+                        print("ended")
+                        return
+                    file = os.path.normpath(unicode(self.filePath(index)))
+                    parent.lock.acquire()
+                    found[category].append(file)
+                    '''
+                    fileItem = QStandardItem(file.split(os.sep)[-1])
+                    fileItem.setCheckable(True)
+                    fileItem.setCheckState(2)
+                    fileItem.setToolTip(file)
+                    parent.files_found_model.invisibleRootItem().setChild(counter, parent.category_number[category], fileItem)
+                    parent.lock.release()
+                    counter += 1
+                    '''
+                    parent.lock.release()
                 else:
                     for path, dirs, files in os.walk(unicode(self.filePath(index))):
                         for filename in files:
                             if QFileInfo(filename).completeSuffix().toLower() in acceptedSuffix:
                                 if self.checkState(self.index(os.path.join(path, filename))) == Qt.Checked:
-                                    found[category].append(os.path.normpath(os.path.join(path, filename)))
-
+                                    if parent.stop:
+                                        print("ended")
+                                        return
+                                    file = os.path.normpath(os.path.join(path, filename))
+                                    parent.lock.acquire()
+                                    found[category].append(file)
+                                    '''
+                                    fileItem = QStandardItem(file.split(os.sep)[-1])
+                                    fileItem.setCheckable(True)
+                                    fileItem.setCheckState(2)
+                                    fileItem.setToolTip(file)
+                                    parent.files_found_model.invisibleRootItem().setChild(counter, parent.category_number[category], fileItem)
+                                    parent.lock.release()
+                                    counter += 1
+                                    '''
+                                    parent.lock.release()
         print("ended")

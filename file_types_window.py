@@ -1,4 +1,4 @@
-from PyQt4.QtGui import QStandardItemModel, QStandardItem, QInputDialog, QMenu
+from PyQt4.QtGui import QStandardItemModel, QStandardItem, QInputDialog, QMenu, QDialog
 from PyQt4.QtCore import Qt, QObject, SIGNAL
 from PyQt4 import uic
 from os import sep
@@ -13,18 +13,17 @@ class FileTypes(base2, form2):
         self.model = QStandardItemModel()
         self.model.itemChanged.connect(self.on_item_changed)
         self.model.setHorizontalHeaderItem(0, QStandardItem(""))
-        self.model_init(parent)
+        self.model_init()
 
-        QObject.connect(self.okCancelBox, SIGNAL("accepted()"), lambda parent_window=parent: self.submit_file_types(parent_window))
-        QObject.connect(self.okCancelBox, SIGNAL("rejected()"), self.close)
-        QObject.connect(self.saveButton, SIGNAL("clicked()"), lambda parent_window=parent: self.save(parent_window))
-
+        self.saveButton.clicked.connect(self.save)
+        self.okCancelBox.accepted.connect(self.accept)
+        self.okCancelBox.rejected.connect(self.reject)
         self.treeView.setContextMenuPolicy(Qt.CustomContextMenu)
         self.treeView.customContextMenuRequested.connect(self.openMenu)
 
 
-    def model_init(self, parent_window):
-        categories = parent_window.selected_file_types
+    def model_init(self):
+        categories = {}
         if not categories:
             with open('categories.json') as f:
                 categories = load(f)
@@ -40,7 +39,7 @@ class FileTypes(base2, form2):
                 catItem.appendRow(typeItem)
             self.model.appendRow(catItem)
         self.treeView.setModel(self.model)
-        self.submit_file_types(parent_window)
+        self.submit_file_types()
 
     def quit(self):
         self.close()
@@ -65,7 +64,7 @@ class FileTypes(base2, form2):
                         return
                 item.parent().setCheckState(Qt.Unchecked)
 
-    def submit_file_types(self, parent_window):
+    def submit_file_types(self):
         categories = []
         root = self.model.invisibleRootItem()
 
@@ -75,9 +74,7 @@ class FileTypes(base2, form2):
             for num_type in range(category.rowCount()):
                 type = category.child(num_type, 0)
                 categories[-1]["Types"].update({str(type.text()): type.checkState()})
-
-        parent_window.selected_file_types = categories
-        self.close()
+        return categories
 
     def openMenu(self, position):
         level = 0
@@ -116,10 +113,9 @@ class FileTypes(base2, form2):
             else:
                 self.model.itemFromIndex(index).parent().appendRow(catType)
 
-    def save(self, parent):
-        self.submit_file_types(parent)
+    def save(self):
         with open('categories.json', 'w') as f:
-            dump(parent.selected_file_types, f)
+            dump(self.submit_file_types(), f)
 
     def remove(self):
         index = self.treeView.selectedIndexes()[0]
@@ -129,3 +125,10 @@ class FileTypes(base2, form2):
         else:
             parent = self.model.invisibleRootItem()
             self.model.removeRow(index.row(), parent.index())
+
+    @staticmethod
+    def call():
+        dialog = FileTypes()
+        result = dialog.exec_()
+        categories = dialog.submit_file_types()
+        return categories, result == QDialog.Accepted
