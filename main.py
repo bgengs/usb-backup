@@ -105,7 +105,7 @@ class MainWindow(base, form):
                 if state == Qt.Checked:
                     selected.append(_type)
             if selected:
-                cat = QStandardItem(element.keys()[0])
+                cat = QStandardItem(element.keys()[0])  # WARNING! it may be unordered
                 self.files_found_model.setHorizontalHeaderItem(header_counter, cat)
                 self.category_number_length.update({element.keys()[0]: [header_counter, 0]})
                 self.files_found_tree.setColumnWidth(header_counter-1, 200)
@@ -194,6 +194,10 @@ class MainWindow(base, form):
             if not path.exists(current_dir):
                 mkdir(current_dir)
             for file_path in files:
+                if file_path == 'deleted':
+                    qApp.processEvents()
+                    self.progressBarBackup.setValue(self.progressBarBackup.value()+1)
+                    continue
                 file_name = file_path.split(sep)[-1]
                 if not self.is_exist(warehouse, file_path, category, now_date):
                     checksumm = Crc(0x104c11db7)
@@ -242,11 +246,10 @@ class MainWindow(base, form):
                     with open(self.current_dir + storage + sep + "init", 'rb') as f:
                         hash_from_storage = f.read(64)
                         cipter_text = f.read()
-                        print(len(hash_from_storage))
-                        print(len(cipter_text))
                         encryptor = AES.new(key+self.padding[len(key):])
                         plain = encryptor.decrypt(cipter_text)
                         if hash_from_storage == SHA256.new(plain).hexdigest():
+                            self.password = key
                             self.encrypt_and_save_to(storage)
                         else:
                             QMessageBox.about(self, "Error", "Incorrect password!")
@@ -261,6 +264,7 @@ class MainWindow(base, form):
                         encryptor = AES.new(self.password+self.padding[len(self.password):])
                         plain = encryptor.decrypt(cipter_text)
                         if hash_from_storage == SHA256.new(plain).hexdigest():
+                            self.password = key
                             self.encrypt_and_save_to(self.selected_storage)
                         else:
                             QMessageBox.about(self, "Error", "Incorrect password!")
@@ -327,6 +331,7 @@ class MainWindow(base, form):
         self.restoreButton.setEnabled(True)
 
     def decrypt_and_save(self, path_to_file, key, new_path):
+        print(path_to_file, key, new_path)
         with open(path_to_file, 'rb') as ciphered:
                 origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
                 iv = ciphered.read(16)

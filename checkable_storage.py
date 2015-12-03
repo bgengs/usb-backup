@@ -48,7 +48,7 @@ class Model(QFileSystemModel):
         for index in dirs.keys():
             if dirs[index] == Qt.Checked:
                 if path.isfile(unicode(self.filePath(index))):
-                    file_dir_path = unicode(self.filePath(index)).split(sep)
+                    file_dir_path = unicode(self.filePath(index)).split('/')
                     print(file_dir_path)
                     storage = file_dir_path[-4].split('/')[-1]
                     date = file_dir_path[-3]
@@ -59,15 +59,17 @@ class Model(QFileSystemModel):
                         found[storage].update({category: {}})
                     if date not in found[storage][category].keys():
                         found[storage][category].update({date: []})
+
                     found[storage][category][date].append(path.normpath(file_dir_path[-1]))
                 else:
                     for cur_path, dirs, files in walk(unicode(self.filePath(index))):
                         for filename in files:
                             if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='init':
-                                file_dir_path = cur_path.split(sep)
-                                storage = file_dir_path[-3].split('/')[-1]
+                                file_dir_path = cur_path.split('/')
+                                storage = file_dir_path[-3]
                                 date = file_dir_path[-2]
                                 category = file_dir_path[-1]
+                                print(storage, date, category)
                                 if storage not in found.keys():
                                     found.update({storage: {}})
                                 if category not in found[storage].keys():

@@ -1,16 +1,20 @@
 from PyQt4.QtGui import QStandardItemModel, QStandardItem, QInputDialog, QMenu, QApplication, QTreeView, QDialog
-from PyQt4.QtCore import Qt, QObject, SIGNAL
+from PyQt4.QtCore import Qt, QObject, SIGNAL, QVariant
 from PyQt4 import uic
 from os import sep
 import sys
+
 base, form = uic.loadUiType("design"+sep+"files_found_dialog.ui")
 class FilesFound(base, form):
     def __init__(self, parent_win=None):
         super(base, self).__init__(parent_win)
         self.setupUi(self)
+        self.parent = parent_win
 
         self.treeViewFound.setIndentation(0)
         self.model = QStandardItemModel()
+        #QObject.connect(self.model, SIGNAL("itemChanged(QStandardItem*)"), lambda parent=parent_win: self.on_item_changed(parent))
+        self.model.itemChanged.connect(self.on_item_changed)
         self.treeViewFound.setModel(self.model)
         parent_win.files_found_model = self.model
         parent_win.files_found_tree = self.treeViewFound
@@ -30,7 +34,12 @@ class FilesFound(base, form):
         parent.stop = True
         self.close()
 
-    #TODO: on_item_changed function
+    def on_item_changed(self, item):
+        cat = unicode(self.model.headerData(item.column(), Qt.Horizontal).toString())
+        if item.checkState() == 2 and unicode(item.toolTip()) != self.parent.files_found[cat][item.row()]:
+            self.parent.files_found[cat][item.row()] = unicode(item.toolTip())
+        elif item.checkState() == 0:
+            self.parent.files_found[cat][item.row()] = 'deleted'
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
