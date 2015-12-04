@@ -81,20 +81,10 @@ class CheckableDirModel(QDirModel):
             if dirs[index] == Qt.Checked:
                 if os.path.isfile(unicode(self.filePath(index))) and QFileInfo(self.filePath(index)).completeSuffix().toLower() in acceptedSuffix:
                     if parent.stop:
-                        print("ended")
                         return
                     file = os.path.normpath(unicode(self.filePath(index)))
                     parent.lock.acquire()
                     found[category].append(file)
-                    '''
-                    fileItem = QStandardItem(file.split(os.sep)[-1])
-                    fileItem.setCheckable(True)
-                    fileItem.setCheckState(2)
-                    fileItem.setToolTip(file)
-                    parent.files_found_model.invisibleRootItem().setChild(counter, parent.category_number[category], fileItem)
-                    parent.lock.release()
-                    counter += 1
-                    '''
                     parent.lock.release()
                 else:
                     for path, dirs, files in os.walk(unicode(self.filePath(index))):
@@ -107,14 +97,16 @@ class CheckableDirModel(QDirModel):
                                     file = os.path.normpath(os.path.join(path, filename))
                                     parent.lock.acquire()
                                     found[category].append(file)
-                                    '''
-                                    fileItem = QStandardItem(file.split(os.sep)[-1])
-                                    fileItem.setCheckable(True)
-                                    fileItem.setCheckState(2)
-                                    fileItem.setToolTip(file)
-                                    parent.files_found_model.invisibleRootItem().setChild(counter, parent.category_number[category], fileItem)
-                                    parent.lock.release()
-                                    counter += 1
-                                    '''
                                     parent.lock.release()
         print("ended")
+
+'''
+#This code led to с000005 error
+fileItem = QStandardItem(file.split(os.sep)[-1])
+fileItem.setCheckable(True)
+fileItem.setCheckState(2)
+fileItem.setToolTip(file)
+parent.files_found_model.invisibleRootItem().setChild(counter, parent.category_number[category], fileItem)
+parent.lock.release()
+counter += 1
+'''

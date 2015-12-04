@@ -82,8 +82,6 @@ class MainWindow(base, form):
         self.restoreButton.clicked.connect(self.restore)
 
 
-    def help(self):
-        pass
 
     def scan(self):
         #self.treeViewComputer.setEnabled(False)
@@ -158,12 +156,11 @@ class MainWindow(base, form):
                         fileItem.setToolTip(self.files_found[cat][i])
                         self.files_found_model.invisibleRootItem().setChild(i, num, fileItem)
                     self.category_number_length[cat][1] = len(files)
-            self.filesFoundLabel.setText("Scanning finished! Files found %s" % sum(len(v) for k, v in self.files_found.items()))
+            self.filesFoundLabel.setText("Scanning finished! Files found %s. Click on the Storage tab" %
+                                         sum(len(v) for k, v in self.files_found.items()))
             self.files_found_bar.setMaximum(1)
             self.files_found_bar.setValue(1)
             self.files_found_ok_enable.setEnabled(True)
-
-
 
     def is_exist(self, storage, file_path, category, now_date):
         file_name = file_path.split(sep)[-1]
@@ -183,7 +180,6 @@ class MainWindow(base, form):
                             if checksumm.hexdigest() == file[-8:]:
                                 return True
         return False
-
 
     def encrypt_and_save_to(self, warehouse):
         files_count = sum(len(f) for f in self.files_found.values())
@@ -282,7 +278,6 @@ class MainWindow(base, form):
         self.restoreButton.setEnabled(False)
         self.threads = []
         self.files_to_restore = {}
-        #print(self.treeViewStorage)
         for index, state in self.model_storage.checks.items():
             th = Thread(target=self.model_storage.exportChecked, args=(self.lock, {index: state}, self.files_to_restore))
             th.start()
@@ -333,7 +328,6 @@ class MainWindow(base, form):
         self.restoreButton.setEnabled(True)
 
     def decrypt_and_save(self, path_to_file, key, new_path):
-        print(path_to_file, key, new_path)
         with open(path_to_file, 'rb') as ciphered:
                 origsize = unpack('<Q', ciphered.read(calcsize('Q')))[0]
                 iv = ciphered.read(16)
@@ -373,6 +367,3 @@ if __name__ == '__main__':
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
-
-            #print(str(self.model_storage.filePath(selected_index).split('/')))
-            #warehouse = str(self.model_storage.filePath(selected_index).split('/')[-1])

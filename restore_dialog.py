@@ -37,7 +37,7 @@ class Restore_type(base, form):
 
     def browse(self):
         self.selected_path = unicode(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        self.labelPath.setText(self.selected_path)
+        self.labelPath.setText(u'Restore to '+self.selected_path)
 
     @staticmethod
     def call(parent=None):
