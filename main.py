@@ -31,6 +31,8 @@ class MainWindow(base, form):
         self.treeViewComputer.setColumnWidth(0, 200)
         self.treeViewComputer.setColumnWidth(1, 80)
         self.treeViewComputer.setColumnWidth(2, 80)
+        self.treeViewComputer.setToolTip('Here you can select folders and files that you want to scanning.\n'
+                                         'Click on checkbox near name of folder that you want to check.')
 
         # some staff
         self.system_encoding = sys.getfilesystemencoding()
@@ -66,25 +68,25 @@ class MainWindow(base, form):
         self.treeViewStorage.setColumnWidth(0, 200)
         self.treeViewStorage.setColumnWidth(1, 80)
         self.treeViewStorage.setColumnWidth(2, 80)
+        self.treeViewStorage.setToolTip('<p><b>Select</b> the storage for backup.</p>'
+                                        '<p><b>Check</b> folders or files to restore</p>')
         self.progressBarBackup.setMinimum(0)
         self.progressBarBackup.setValue(0)
 
         # buttons
         self.scanButton.clicked.connect(self.scan)
         self.fileTypesButton.clicked.connect(self.select_file_types)
-        self.backupButtonComp.clicked.connect(self.backup)
         self.backupButtonStorage.clicked.connect(self.backup)
         self.tabWidgetRoot.setCurrentWidget(self.tab_computer)
         self.newStorageButton.clicked.connect(self.add_storage)
-        self.helpButtonComputer.clicked.connect(self.help)
         self.restoreButton.clicked.connect(self.restore)
 
+
     def help(self):
-        print(self.files_found)
+        pass
 
     def scan(self):
         #self.treeViewComputer.setEnabled(False)
-        self.backupButtonComp.setEnabled(False)
         #self.fileTypesButton.setEnabled(False)
         self.files_found = {}
         self.threads = []
@@ -128,17 +130,18 @@ class MainWindow(base, form):
             self.filesFoundLabel.setText("Scanning...")
 
             if (time.time() - start_time) % 2 == 0:
-                self.lock.acquire()
-                for cat, (num, length) in self.category_number_length.items():
-                    files = self.files_found[cat]
-                    for i in range(length, len(files)):
-                        fileItem = QStandardItem(self.files_found[cat][i].split(sep)[-1])
-                        fileItem.setCheckable(True)
-                        fileItem.setCheckState(2)
-                        fileItem.setToolTip(self.files_found[cat][i])
-                        self.files_found_model.invisibleRootItem().setChild(i, num, fileItem)
-                    self.category_number_length[cat][1] = len(files)
-                self.lock.release()
+                if self.files_found:
+                    self.lock.acquire()
+                    for cat, (num, length) in self.category_number_length.items():
+                        files = self.files_found[cat]
+                        for i in range(length, len(files)):
+                            fileItem = QStandardItem(self.files_found[cat][i].split(sep)[-1])
+                            fileItem.setCheckable(True)
+                            fileItem.setCheckState(2)
+                            fileItem.setToolTip(self.files_found[cat][i])
+                            self.files_found_model.invisibleRootItem().setChild(i, num, fileItem)
+                        self.category_number_length[cat][1] = len(files)
+                    self.lock.release()
 
         if self.stop:
             self.filesFoundLabel.setText("Scanning was stopped by user")
@@ -146,6 +149,7 @@ class MainWindow(base, form):
             self.threads = []
         else:
             for cat, (num, length) in self.category_number_length.items():
+                if self.files_found:
                     files = self.files_found[cat]
                     for i in range(length, len(files)):
                         fileItem = QStandardItem(self.files_found[cat][i].split(sep)[-1])
@@ -158,9 +162,7 @@ class MainWindow(base, form):
             self.files_found_bar.setMaximum(1)
             self.files_found_bar.setValue(1)
             self.files_found_ok_enable.setEnabled(True)
-        #self.treeViewComputer.setEnabled(True)
-        self.backupButtonComp.setEnabled(True)
-        #self.fileTypesButton.setEnabled(True)
+
 
 
     def is_exist(self, storage, file_path, category, now_date):

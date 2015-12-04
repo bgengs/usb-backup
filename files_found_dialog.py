@@ -1,8 +1,13 @@
-from PyQt4.QtGui import QStandardItemModel, QStandardItem, QInputDialog, QMenu, QApplication, QTreeView, QDialog
+from PyQt4.QtGui import QStandardItemModel, QItemSelectionModel, QItemSelection, QStandardItem, QInputDialog, QMenu, QApplication, QTreeView, QDialog
 from PyQt4.QtCore import Qt, QObject, SIGNAL, QVariant
 from PyQt4 import uic
 from os import sep
-import sys
+import sys, subprocess
+
+class MyModel(QStandardItemModel ):
+    def __init__(self, parent=None):
+        super(MyModel, self).__init__(parent)
+
 
 base, form = uic.loadUiType("design"+sep+"files_found_dialog.ui")
 class FilesFound(base, form):
@@ -12,10 +17,18 @@ class FilesFound(base, form):
         self.parent = parent_win
 
         self.treeViewFound.setIndentation(0)
+        self.treeViewFound.setToolTip("Here you can see files that was found on your computer.\n"
+                                      "If you don't want backup it - just uncheck it.\n"
+                                      "Right click on file to show file in Explorer")
         self.model = QStandardItemModel()
+        #self.model = MyModel(self)
+        #self.selModel = QItemSelectionModel(self.model)
         #QObject.connect(self.model, SIGNAL("itemChanged(QStandardItem*)"), lambda parent=parent_win: self.on_item_changed(parent))
         self.model.itemChanged.connect(self.on_item_changed)
+
         self.treeViewFound.setModel(self.model)
+        #self.treeViewFound.setSelectionModel(self.selModel)
+        #self.treeViewFound.selectionModel().selectionChanged.connect(self.on_item_changed)
         parent_win.files_found_model = self.model
         parent_win.files_found_tree = self.treeViewFound
         self.okButton.setEnabled(False)
@@ -25,6 +38,8 @@ class FilesFound(base, form):
         self.progressBar.setMinimum(0)
         parent_win.files_found_bar = self.progressBar
         parent_win.files_found_ok_enable = self.okButton
+        self.treeViewFound.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.treeViewFound.customContextMenuRequested.connect(self.open_menu)
 
     def ok(self, parent):
         parent.files_found_ok = True
@@ -40,6 +55,17 @@ class FilesFound(base, form):
             self.parent.files_found[cat][item.row()] = unicode(item.toolTip())
         elif item.checkState() == 0:
             self.parent.files_found[cat][item.row()] = 'deleted'
+
+    def open_menu(self, position):
+        index = self.treeViewFound.selectedIndexes()[0]
+        path = self.model.itemFromIndex(index).toolTip()
+        menu = QMenu()
+        menu.addAction(self.tr("Show in Explorer"), lambda x=path: self.path_to_buffer(x))
+        menu.exec_(self.treeViewFound.viewport().mapToGlobal(position))
+
+    def path_to_buffer(self, path):
+        #TODO: make it crossplatform
+        subprocess.Popen('explorer "%s"' % (sep.join(str(x) for x in path.split(sep)[:-1])))
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

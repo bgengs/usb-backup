@@ -20,7 +20,7 @@ class FileTypes(base2, form2):
         self.okCancelBox.rejected.connect(self.reject)
         self.treeView.setContextMenuPolicy(Qt.CustomContextMenu)
         self.treeView.customContextMenuRequested.connect(self.openMenu)
-
+        self.treeView.setToolTip('Here you can select file types that you want to find. Also you can\nadd new category or file type. Click right button on it.')
 
     def model_init(self):
         categories = {}

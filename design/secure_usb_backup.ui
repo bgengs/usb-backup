@@ -61,17 +61,17 @@
           </property>
          </widget>
         </item>
-        <item row="5" column="1">
-         <widget class="QPushButton" name="backupButtonComp">
+        <item row="1" column="1">
+         <widget class="QPushButton" name="fileTypesButton">
           <property name="text">
-           <string>Backup</string>
+           <string>File types</string>
           </property>
          </widget>
         </item>
-        <item row="6" column="1">
-         <widget class="QPushButton" name="helpButtonComputer">
+        <item row="2" column="1">
+         <widget class="QPushButton" name="scanButton">
           <property name="text">
-           <string>Help</string>
+           <string>Scan</string>
           </property>
          </widget>
         </item>
@@ -88,28 +88,14 @@
           </property>
          </spacer>
         </item>
-        <item row="2" column="1">
-         <widget class="QPushButton" name="scanButton">
-          <property name="text">
-           <string>Scan</string>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="1">
-         <widget class="QPushButton" name="fileTypesButton">
-          <property name="text">
-           <string>File types</string>
-          </property>
-         </widget>
-        </item>
-        <item row="7" column="0">
+        <item row="6" column="0">
          <widget class="QLabel" name="filesFoundLabel">
           <property name="text">
            <string>Files found</string>
           </property>
          </widget>
         </item>
-        <item row="1" column="0" rowspan="6">
+        <item row="1" column="0" rowspan="5">
          <widget class="QTreeView" name="treeViewComputer"/>
         </item>
        </layout>
@@ -165,13 +151,6 @@
           </property>
          </widget>
         </item>
-        <item row="5" column="1">
-         <widget class="QPushButton" name="helpButtonStorage">
-          <property name="text">
-           <string>Help</string>
-          </property>
-         </widget>
-        </item>
         <item row="1" column="0" rowspan="5">
          <widget class="QTreeView" name="treeViewStorage"/>
         </item>
@@ -190,19 +169,6 @@
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
- <tabstops>
-  <tabstop>treeViewComputer</tabstop>
-  <tabstop>fileTypesButton</tabstop>
-  <tabstop>scanButton</tabstop>
-  <tabstop>backupButtonStorage</tabstop>
-  <tabstop>treeViewStorage</tabstop>
-  <tabstop>newStorageButton</tabstop>
-  <tabstop>restoreButton</tabstop>
-  <tabstop>backupButtonComp</tabstop>
-  <tabstop>helpButtonComputer</tabstop>
-  <tabstop>helpButtonStorage</tabstop>
-  <tabstop>tabWidgetRoot</tabstop>
- </tabstops>
  <resources/>
  <connections/>
 </ui>
