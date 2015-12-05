@@ -290,11 +290,15 @@ class MainWindow(base, form):
             status = map(Thread.isAlive, self.threads)
 
         self.progressBarBackup.setMaximum(100)
+        self.progressBarBackup.setValue(100)
         if self.files_to_restore:
+            files_count = sum(len(f) for cat in self.files_to_restore.values() for date in cat.values() for f in date.values()[0])
+            self.progressBarBackup.setMaximum(files_count)
+            self.progressBarBackup.setValue(0)
             dialog = Restore_type(self)
             dialog.setModal(True)
             self.prev_or_spec, self.path_to_restore, ok = dialog.call(self)
-
+            print(self.files_to_restore)
             if ok:
                 for storage, categories in self.files_to_restore.items():
                     dialog = QInputDialog()
@@ -315,10 +319,10 @@ class MainWindow(base, form):
                                         for backup in sorted_by_date:
                                             for fn in backups[backup]:
                                                 path_to_file = self.current_dir+storage+sep+backup+sep+cat+sep+fn
-                                                if fn.split('.')[-1] == 'link':
-                                                    path_to_file = open(self.current_dir+storage+sep+backup+sep+cat+sep+fn, 'r').read()
                                                 self.decrypt_and_save(path_to_file, key,
                                                                       new_path=self.path_to_restore+sep+cat if not self.prev_or_spec else '')
+                                                self.progressBarBackup.setValue(self.progressBarBackup.value()+1)
+                                    self.progressBarBackup.setValue(self.progressBarBackup.maximum())
                                 else:
                                     QMessageBox.about(self, "Error", "Incorrect password!")
                         except UnicodeError:
@@ -339,7 +343,12 @@ class MainWindow(base, form):
                     path_to_save = new_path+sep+file_name
                     if path.exists(path_to_save):
                         path_to_save = new_path+sep+path_to_file.split(sep)[-1]
-
+                else:
+                    p = ''
+                    for dir in path_to_save.split(sep)[:-1]:
+                        p += dir + sep
+                        if not path.exists(p):
+                            mkdir(p)
                 decryptor = AES.new(key+self.padding[len(key):], AES.MODE_CBC, iv)
                 chunksize = 24*1024
                 with open(path_to_save, 'wb') as outfile:

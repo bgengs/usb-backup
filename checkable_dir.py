@@ -101,7 +101,7 @@ class CheckableDirModel(QDirModel):
         print("ended")
 
 '''
-#This code led to с000005 error
+
 fileItem = QStandardItem(file.split(os.sep)[-1])
 fileItem.setCheckable(True)
 fileItem.setCheckState(2)

@@ -49,7 +49,6 @@ class Model(QFileSystemModel):
             if dirs[index] == Qt.Checked:
                 if path.isfile(unicode(self.filePath(index))):
                     file_dir_path = unicode(self.filePath(index)).split('/')
-                    print(file_dir_path)
                     storage = file_dir_path[-4].split('/')[-1]
                     date = file_dir_path[-3]
                     category = file_dir_path[-2]
@@ -65,7 +64,7 @@ class Model(QFileSystemModel):
                     for cur_path, dirs, files in walk(unicode(self.filePath(index))):
                         for filename in files:
                             if self.checkState(self.index(path.join(cur_path, filename))) == Qt.Checked and filename!='init':
-                                file_dir_path = cur_path.split('/')
+                                file_dir_path = path.normpath(cur_path).split(sep)
                                 storage = file_dir_path[-3]
                                 date = file_dir_path[-2]
                                 category = file_dir_path[-1]
