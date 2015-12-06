@@ -68,7 +68,6 @@ class Model(QFileSystemModel):
                                 storage = file_dir_path[-3]
                                 date = file_dir_path[-2]
                                 category = file_dir_path[-1]
-                                print(storage, date, category)
                                 if storage not in found.keys():
                                     found.update({storage: {}})
                                 if category not in found[storage].keys():

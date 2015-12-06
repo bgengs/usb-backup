@@ -1,8 +1,8 @@
-from PyQt4.QtGui import QStandardItemModel, QItemSelectionModel, QItemSelection, QStandardItem, QInputDialog, QMenu, QApplication, QTreeView, QDialog
+from PyQt4.QtGui import QStandardItemModel, QMessageBox, QItemSelectionModel, QItemSelection, QStandardItem, QInputDialog, QMenu, QApplication, QTreeView, QDialog
 from PyQt4.QtCore import Qt, QObject, SIGNAL, QVariant
 from PyQt4 import uic
 from os import sep
-import sys, subprocess
+import sys, subprocess, platform
 
 class MyModel(QStandardItemModel ):
     def __init__(self, parent=None):
@@ -64,8 +64,14 @@ class FilesFound(base, form):
         menu.exec_(self.treeViewFound.viewport().mapToGlobal(position))
 
     def path_to_buffer(self, path):
-        #TODO: make it crossplatform
-        subprocess.Popen('explorer "%s"' % (sep.join(str(x) for x in path.split(sep)[:-1])))
+        if platform.system() == 'Windows':
+            subprocess.Popen('explorer "%s"' % (sep.join(str(x) for x in path.split(sep)[:-1])))
+        elif platform.system() == 'Darwin':
+            subprocess.Popen(['open', sep.join(str(x) for x in path.split(sep)[:-1])])
+        elif platform.system() == 'Linux':
+            subprocess.Popen(['xdg-open', sep.join(str(x) for x in path.split(sep)[:-1])])
+        else:
+            QMessageBox.about(self, "Error", "OS is not recognized. Send me email about your problem. peretsmobil@gmail.com ")
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

@@ -87,6 +87,7 @@ class MainWindow(base, form):
         #self.treeViewComputer.setEnabled(False)
         #self.fileTypesButton.setEnabled(False)
         self.files_found = {}
+        self.category_number_length = {}
         self.threads = []
         self.stop = False
         if not self.selected_file_types:
@@ -169,7 +170,7 @@ class MainWindow(base, form):
                     for file in files:
                         if file[:-8] == file_name:
                             checksumm = Crc(0x104c11db7)
-                            checksumm.update(file_path)
+                            checksumm.update(file_path.encode('utf-8'))
                             checksumm.update(str(stat(file_path)[-2]))
                             with open(file_path, 'rb') as reader:
                                 chunk = reader.read(1024*1024*8)
@@ -191,6 +192,7 @@ class MainWindow(base, form):
             current_dir = self.current_dir + warehouse + sep + now_date + sep + category + sep
             if not path.exists(current_dir):
                 mkdir(current_dir)
+            print(files)
             for file_path in files:
                 if file_path == 'deleted':
                     qApp.processEvents()
@@ -199,7 +201,7 @@ class MainWindow(base, form):
                 file_name = file_path.split(sep)[-1]
                 if not self.is_exist(warehouse, file_path, category, now_date):
                     checksumm = Crc(0x104c11db7)
-                    checksumm.update(file_path)
+                    checksumm.update(file_path.encode('utf-8'))
                     checksumm.update(str(stat(file_path)[-2]))  # modification time
                     with open(file_path, 'rb') as reader, open(current_dir+file_name, 'wb') as writer:
                         chunksize=64*1024*16
@@ -209,8 +211,8 @@ class MainWindow(base, form):
 
                         writer.write(pack('<Q', filesize))
                         writer.write(iv)
-                        writer.write(pack('<B', len(file_path)))
-                        writer.write(file_path)
+                        writer.write(pack('<B', len(file_path.encode('utf-8'))))
+                        writer.write(file_path.encode('utf-8'))
 
                         part = reader.read(chunksize)
                         checksumm.update(part)
@@ -239,7 +241,7 @@ class MainWindow(base, form):
             dialog.setModal(True)
             key, ok = dialog.getText(self, "Key", "Enter key for <b>%s</b> storage" % storage, mode=QLineEdit.Password)
             if ok:
-                try:
+                #try:
                     key = str(key)
                     with open(self.current_dir + storage + sep + "init", 'rb') as f:
                         hash_from_storage = f.read(64)
@@ -251,8 +253,8 @@ class MainWindow(base, form):
                             self.encrypt_and_save_to(storage)
                         else:
                             QMessageBox.about(self, "Error", "Incorrect password!")
-                except UnicodeError:
-                    QMessageBox.about(self, "Error", "Incorrect password!")
+                #except UnicodeError:
+                #    QMessageBox.about(self, "Unicode error", "Incorrect password!")
 
         except IndexError:
             if self.selected_storage:
@@ -262,15 +264,14 @@ class MainWindow(base, form):
                         encryptor = AES.new(self.password+self.padding[len(self.password):])
                         plain = encryptor.decrypt(cipter_text)
                         if hash_from_storage == SHA256.new(plain).hexdigest():
-                            self.password = key
                             self.encrypt_and_save_to(self.selected_storage)
                         else:
-                            QMessageBox.about(self, "Error", "Incorrect password!")
+                            QMessageBox.about(self, "Error", "Incorrect password! sel")
             else:
                 QMessageBox.about(self, "Error", "Select the storage before creating backup!")
                 self.tabWidgetRoot.setCurrentWidget(self.tab_storage)
-        except WindowsError:
-            QMessageBox.about(self, "Error", "Too little time for previous backup!\nWait a minute, please.")
+        #except WindowsError:
+        #    QMessageBox.about(self, "Error", "Too little time for previous backup!\nWait a minute, please.")
 
     def restore(self):
         self.progressBarBackup.setMinimum(0)
@@ -298,7 +299,6 @@ class MainWindow(base, form):
             dialog = Restore_type(self)
             dialog.setModal(True)
             self.prev_or_spec, self.path_to_restore, ok = dialog.call(self)
-            print(self.files_to_restore)
             if ok:
                 for storage, categories in self.files_to_restore.items():
                     dialog = QInputDialog()

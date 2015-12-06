@@ -50,13 +50,11 @@ class CheckableDirModel(QDirModel):
         i = 0
         child = index.child(i, 0)
         if self.filePath(child):
-            print(self.filePath(child))
             self.childCount(child)
         while self.filePath(child):
             i += 1
             child = index.child(i, 0)
             if self.filePath(child):
-                print(self.filePath(child))
                 self.childCount(child)
 
     def checkedCount(self, index=QModelIndex()):
