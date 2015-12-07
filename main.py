@@ -122,13 +122,12 @@ class MainWindow(base, form):
                     self.threads.append(th)
 
         status = map(Thread.isAlive, self.threads)
-        start_time = time.time()
+        start_time = int(time.time())
         while any(status):
             qApp.processEvents()
             status = map(Thread.isAlive, self.threads)
             self.filesFoundLabel.setText("Scanning...")
-
-            if (time.time() - start_time) % 2 == 0:
+            if (int(time.time()) - start_time) % 2 == 0:
                 if self.files_found:
                     self.lock.acquire()
                     for cat, (num, length) in self.category_number_length.items():
